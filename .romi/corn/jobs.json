@@ -1,0 +1,62 @@
+{
+  "version": 1,
+  "jobs": [
+    {
+      "id": "00cda2df-d653-4362-9399-73be371e8d93",
+      "agentId": "main",
+      "name": "Daily Social Media Planner",
+      "enabled": true,
+      "createdAtMs": 1770730479324,
+      "updatedAtMs": 1770972844409,
+      "schedule": {
+        "expr": "0 09 * * *",
+        "kind": "cron",
+        "tz": "Asia/Dhaka"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "now",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "Hey Remal! 🎯\n\nTime to plan today's social content! Here are some ideas:\n\n📱 **LinkedIn:** Tech tip, server setup advice, or industry news?\n📘 **Facebook:** More casual - behind the scenes, project updates, or life as a dev?\n🐦 **X/Twitter:** Quick thoughts, hot takes, or retweet-worthy content?\n\nWhat's on your mind today? What do you want to share with your network?"
+      },
+      "delivery": {
+        "mode": "announce"
+      },
+      "state": {
+        "nextRunAtMs": 1771038000000,
+        "lastRunAtMs": 1770972844411,
+        "lastStatus": "error",
+        "lastDurationMs": 36828,
+        "lastError": "cron delivery target is missing"
+      }
+    },
+    {
+      "id": "30f39344-2122-4000-b2f5-9e912bb25a0a",
+      "agentId": "main",
+      "name": "Evening Social Content Check",
+      "enabled": true,
+      "createdAtMs": 1770730531120,
+      "updatedAtMs": 1770991228514,
+      "schedule": {
+        "expr": "0 20 * * *",
+        "kind": "cron",
+        "tz": "Asia/Dhaka"
+      },
+      "sessionTarget": "isolated",
+      "wakeMode": "now",
+      "payload": {
+        "kind": "agentTurn",
+        "message": "Evening check-in! 🌙\n\nDid you post anything today or have content ready for tomorrow?\n\nQuick review:\n- LinkedIn post ready for 7:30 AM?\n- Any tech discoveries worth sharing?\n- Weekend project to showcase?\n\nDrop me a topic and I'll help craft the post! 💪"
+      },
+      "delivery": {
+        "mode": "announce"
+      },
+      "state": {
+        "nextRunAtMs": 1771077600000,
+        "lastRunAtMs": 1770991200022,
+        "lastStatus": "ok",
+        "lastDurationMs": 28492
+      }
+    }
+  ]
+}

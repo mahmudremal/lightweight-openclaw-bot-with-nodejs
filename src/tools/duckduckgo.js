@@ -1,6 +1,10 @@
 import axios from "axios";
+import { getActiveConfig } from "../config/index.js";
 
 export async function performSearch(query) {
+  const config = await getActiveConfig();
+  const maxResults = config.tools.duckduckgo?.max_results || 5;
+
   try {
     const res = await axios.get("https://api.duckduckgo.com/", {
       params: {
@@ -24,7 +28,7 @@ export async function performSearch(query) {
     }
 
     if (Array.isArray(data.RelatedTopics)) {
-      data.RelatedTopics.slice(0, 5).forEach((t) => {
+      data.RelatedTopics.slice(0, maxResults).forEach((t) => {
         if (t.FirstURL)
           results.push({
             title: t.Text || t.Name || query,

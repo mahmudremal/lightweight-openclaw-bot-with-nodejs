@@ -1,8 +1,5 @@
-# Heartbeat Tasks
+# HEARTBEAT.md
 
-This file is checked every 30 minutes by the agent.
-Add tasks below that you want the agent to work on periodically.
+# Keep this file empty (or with only comments) to skip heartbeat API calls.
 
-## Active Tasks
-
-## Completed
+# Add tasks below when you want the agent to check something periodically.

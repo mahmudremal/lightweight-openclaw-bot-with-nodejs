@@ -1,14 +1,9 @@
-import readline from "readline";
+// import readline from "readline"; // Remove this
 import { processMessage } from "../core/agent.js";
 
 const EXIT_COMMANDS = new Set(["exit", "quit", "/exit", "/quit", ":q"]);
 
-export function startChat() {
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout,
-  });
-
+export function startChat(rl) {
   console.log("\n🐪 Romi — Interactive Chat");
   console.log("Type your message. Type 'exit' to quit.\n");
 

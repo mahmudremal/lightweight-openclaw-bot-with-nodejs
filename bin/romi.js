@@ -10,8 +10,23 @@ import { startWhatsAppClient, sendWhatsApp } from "../src/channels/whatsapp.js";
 import { startChat } from "../src/channels/terminal.js";
 import { initProject } from "../src/init.js";
 import { processMessage } from "../src/core/agent.js";
-import { ensureWorkspace } from "../src/core/workspace.js";
+import {
+  setActiveWorkspace,
+  listWorkspaces,
+  createWorkspace,
+  getActiveWorkspaceId,
+  isInitialized,
+} from "../src/core/workspace.js";
+import {
+  getWorkspaceSkills,
+  getInstallableSkills,
+  installSkill,
+  removeSkill,
+} from "../src/core/skillManager.js";
 import browser from "../src/utils/browser.js";
+import logger from "../src/utils/logger.js";
+import readline from "readline";
+import path from "path";
 
 const PORT = 8123;
 const program = new Command();
@@ -23,7 +38,7 @@ program
 let heartbeat = null;
 
 async function cleanup() {
-  console.log("\nShutting down...");
+  logger.log("ROMI", "\nShutting down...");
   try {
     if (heartbeat) heartbeat.stop();
     await browser.close();
@@ -36,12 +51,23 @@ async function cleanup() {
 process.on("SIGINT", cleanup);
 process.on("SIGTERM", cleanup);
 
+const rl = readline.createInterface({
+  input: process.stdin,
+  output: process.stdout,
+});
+
+function askQuestion(query) {
+  return new Promise((resolve) => rl.question(query, resolve));
+}
+
 program
   .command("start")
   .description("Start server + scheduler + heartbeat + whatsapp")
   .option("-p, --port <n>", "server port", PORT)
   .action(async (opts) => {
-    ensureWorkspace();
+    setActiveWorkspace("default");
+    logger.info("ROMI", `Starting services in default workspace.`);
+
     startServer(Number(opts.port));
     startCron();
 
@@ -61,26 +87,106 @@ program
 program
   .command("chat")
   .description("Interactive terminal chat with Romi")
-  .action(() => {
-    ensureWorkspace();
-    startChat();
+  .option("-w, --workspace <name>", "Specify the workspace to chat in")
+  .action(async (opts) => {
+    let workspaceName = opts.workspace;
+
+    if (!workspaceName) {
+      const workspaces = await listWorkspaces();
+      if (workspaces.length === 0) {
+        logger.info(
+          "ROMI",
+          "No workspaces found. Creating a 'default' workspace.",
+        );
+        await createWorkspace("default");
+        workspaceName = "default";
+      } else if (workspaces.length === 1) {
+        workspaceName = workspaces[0];
+        logger.info(
+          "ROMI",
+          `Automatically selected workspace: '${workspaceName}'`,
+        );
+      } else {
+        logger.info("ROMI", "Available workspaces:");
+        workspaces.forEach((ws, index) =>
+          logger.info("ROMI", `  ${index + 1}. ${ws}`),
+        );
+        const answer = await askQuestion(
+          "Enter the number of the workspace you want to use, or type a new name to create one: ",
+        );
+        const selectedIndex = parseInt(answer, 10) - 1;
+
+        if (
+          !isNaN(selectedIndex) &&
+          selectedIndex >= 0 &&
+          selectedIndex < workspaces.length
+        ) {
+          workspaceName = workspaces[selectedIndex];
+        } else {
+          workspaceName = answer.trim();
+          try {
+            await createWorkspace(workspaceName);
+            logger.info("ROMI", `Created new workspace: '${workspaceName}'`);
+          } catch (error) {
+            if (error.message.includes("already exists")) {
+              logger.info(
+                "ROMI",
+                `Workspace '${workspaceName}' already exists. Using it.`,
+              );
+            } else {
+              logger.error(
+                "ROMI",
+                `Error creating workspace '${workspaceName}': ${error.message}`,
+              );
+              process.exit(1);
+            }
+          }
+        }
+      }
+    }
+
+    const allWorkspaces = await listWorkspaces();
+    if (!allWorkspaces.includes(workspaceName)) {
+      logger.error(
+        "ROMI",
+        `Workspace '${workspaceName}' not found. Please create it first or choose an existing one.`,
+      );
+      process.exit(1);
+    }
+
+    setActiveWorkspace(workspaceName);
+    logger.info("ROMI", `Chatting in workspace: '${workspaceName}'`);
+    startChat(rl);
   });
 
 program
   .command("ask <message...>")
   .description("Send a single message and get a reply")
-  .action(async (message) => {
-    ensureWorkspace();
+  .option("-w, --workspace <name>", "Specify the workspace to use")
+  .action(async (message, opts) => {
+    let workspaceName = opts.workspace || "default";
+
+    const allWorkspaces = await listWorkspaces();
+    if (!allWorkspaces.includes(workspaceName)) {
+      logger.error(
+        "ROMI",
+        `Workspace '${workspaceName}' not found. Please create it first or choose an existing one.`,
+      );
+      process.exit(1);
+    }
+    setActiveWorkspace(workspaceName);
+    logger.info("ROMI", `Using workspace: '${workspaceName}' for ask command.`);
+
     const text = Array.isArray(message) ? message.join(" ") : message;
     try {
       const reply = await processMessage(text, {
         channel: "cli",
         from: "cli:user",
       });
-      console.log(reply);
+      logger.log("ROMI", reply);
       process.exit(0);
     } catch (err) {
-      console.error(err.message);
+      logger.error("ROMI", err.message);
       process.exit(1);
     }
   });
@@ -89,37 +195,184 @@ program
   .command("server")
   .description("Start webhook server only")
   .option("-p, --port <n>", "server port", PORT)
-  .action(async (opts) => startServer(Number(opts.port)));
+  .action(async (opts) => {
+    setActiveWorkspace("default");
+    logger.info("ROMI", `Starting server in default workspace.`);
+    startServer(Number(opts.port));
+  });
 
 program
   .command("cron")
   .description("Start scheduler")
-  .action(async () => startCron());
+  .action(async () => {
+    setActiveWorkspace("default");
+    logger.info("ROMI", `Starting cron scheduler in default workspace.`);
+    startCron();
+  });
 
 program
   .command("send <to> <message...>")
   .description("Send a WhatsApp message")
-  .action(async (to, message) => {
+  .option("-w, --workspace <name>", "Specify the workspace to use")
+  .action(async (to, message, opts) => {
+    let workspaceName = opts.workspace || "default";
+
+    const allWorkspaces = await listWorkspaces();
+    if (!allWorkspaces.includes(workspaceName)) {
+      logger.error(
+        "ROMI",
+        `Workspace '${workspaceName}' not found. Please create it first or choose an existing one.`,
+      );
+      process.exit(1);
+    }
+    setActiveWorkspace(workspaceName);
+    logger.info(
+      "ROMI",
+      `Using workspace: '${workspaceName}' for send command.`,
+    );
+
     try {
       await sendWhatsApp(
         to,
         Array.isArray(message) ? message.join(" ") : message,
       );
-      console.log("Message sent.");
+      logger.log("ROMI", "Message sent.");
       process.exit(0);
     } catch (err) {
-      console.error(err.message);
+      logger.error("ROMI", err.message);
       process.exit(1);
     }
   });
 
 program
+  .command("skills")
+  .description("Manage skills in the current workspace")
+  .addCommand(
+    new Command("list")
+      .description("List skills")
+      .option(
+        "-i, --installed",
+        "List skills installed in the active workspace (default lists installable skills)",
+      )
+      .action(async (opts) => {
+        const activeWorkspaceId = getActiveWorkspaceId();
+        logger.info("ROMI", `Active workspace: ${activeWorkspaceId}`);
+
+        if (opts.installed) {
+          // If --installed is specified, list installed skills
+          logger.info(
+            "ROMI",
+            `\n--- Skills Installed in '${activeWorkspaceId}' Workspace ---`,
+          );
+          const installedSkills = await getWorkspaceSkills(activeWorkspaceId);
+          if (installedSkills.length === 0) {
+            logger.info(
+              "ROMI",
+              `No skills installed in workspace '${activeWorkspaceId}'.`,
+            );
+            logger.info(
+              "ROMI",
+              "Use 'romi skills list' to see available skills, and 'romi skills install <name>' to install them.",
+            );
+          } else {
+            installedSkills.forEach((skill) => {
+              logger.info(
+                "ROMI",
+                `  ${skill.name} ${skill.emoji || ""} - ${skill.description}`,
+              );
+            });
+          }
+        } else {
+          // Default behavior: list installable skills
+          logger.info("ROMI", "\n--- All Installable Skills (Repository) ---");
+          const installableSkills = await getInstallableSkills();
+          if (installableSkills.length === 0) {
+            logger.info(
+              "ROMI",
+              "No installable skills found in the repository.",
+            );
+          } else {
+            installableSkills.forEach((skill) => {
+              logger.info(
+                "ROMI",
+                `  ${skill.name} ${skill.emoji || ""} - ${skill.description}`,
+              );
+            });
+          }
+        }
+        process.exit(0);
+      }),
+  )
+  .addCommand(
+    new Command("install <skillName>")
+      .description("Install a skill into the active workspace")
+      .action(async (skillName) => {
+        console.log(skillName);
+        const activeWorkspaceId = getActiveWorkspaceId();
+        try {
+          const result = await installSkill(skillName, activeWorkspaceId);
+          logger.log("ROMI", result);
+          logger.log(
+            "ROMI",
+            `Skill '${skillName}' installed in workspace '${activeWorkspaceId}'. Don't forget to update your config if needed!`,
+          );
+        } catch (error) {
+          logger.error(
+            "ROMI",
+            `Failed to install skill '${skillName}': ${error.message}`,
+          );
+          process.exit(1);
+        }
+        process.exit(0);
+      }),
+  )
+  .addCommand(
+    new Command("remove <skillName>")
+      .description("Remove a skill from the active workspace")
+      .action(async (skillName) => {
+        const activeWorkspaceId = getActiveWorkspaceId();
+        try {
+          const result = await removeSkill(skillName, activeWorkspaceId);
+          logger.log("ROMI", result);
+        } catch (error) {
+          logger.error(
+            "ROMI",
+            `Failed to remove skill '${skillName}': ${error.message}`,
+          );
+          process.exit(1);
+        }
+        process.exit(0);
+      }),
+  );
+
+program
   .command("init [dir]")
   .description("Initialize a Romi project and workspace")
-  .action(async (dir = ".") => {
-    await initProject(dir);
-    ensureWorkspace();
-    console.log("Initialized Romi project in", dir);
+  .action(async (dir = "default") => {
+    await initProject();
+    if (dir !== "default") {
+      try {
+        await createWorkspace(dir);
+        logger.log("ROMI", `Created new workspace: '${dir}'`);
+      } catch (error) {
+        if (error.message.includes("already exists")) {
+          logger.warn("ROMI", `Workspace '${dir}' already exists.`);
+        } else {
+          logger.error(
+            "ROMI",
+            `Error creating workspace '${dir}': ${error.message}`,
+          );
+          process.exit(1);
+        }
+      }
+    } else {
+      logger.log("ROMI", `Ensured default workspace is initialized.`);
+    }
+    process.exit(0);
   });
 
 program.parse(process.argv);
+
+process.on("exit", () => {
+  rl.close();
+});

@@ -1,37 +1,20 @@
 import fs from "fs-extra";
 import path from "path";
+import { ROOT_DIR, WORKSPACES_DIR, createWorkspace } from "./core/workspace.js";
 
-export async function initProject(dir = ".") {
-  const base = path.resolve(dir);
-  await fs.ensureDir(base);
+export async function initProject() {
+  await fs.ensureDir(ROOT_DIR);
 
-  const cfg = {
-    name: "romi-project",
-    channels: {
-      whatsapp: {
-        provider: "twilio",
-        from: process.env.TWILIO_WHATSAPP_FROM || "whatsapp:+14155238886",
-      },
-    },
-    llm: { provider: "openai" },
-    tools: { search: "duckduckgo" },
-    server: { port: 8123 },
-  };
+  await fs.ensureDir(WORKSPACES_DIR);
 
-  const cronjobs = [
-    { name: "morning", schedule: "0 8 * * *", message: "Good morning!" },
-  ];
-
-  const cfgPath = path.join(base, "romi.config.json");
-  if (!(await fs.pathExists(cfgPath))) {
-    await fs.writeJson(cfgPath, { ...cfg, cron: cronjobs }, { spaces: 2 });
-  }
-
-  const envPath = path.join(base, ".env");
-  if (!(await fs.pathExists(envPath))) {
-    const exampleEnv = path.join(base, ".env.example");
-    if (await fs.pathExists(exampleEnv)) {
-      await fs.copy(exampleEnv, envPath);
+  try {
+    await createWorkspace("default");
+    console.log(`Created default workspace.`);
+  } catch (error) {
+    if (error.message.includes("already exists")) {
+      console.log(`Default workspace already exists.`);
+    } else {
+      console.error(`Error creating default workspace: ${error.message}`);
     }
   }
 }

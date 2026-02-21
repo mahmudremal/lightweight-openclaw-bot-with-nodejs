@@ -1,6 +1,7 @@
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import { ROOT_DIR } from "../core/workspace.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -24,11 +25,12 @@ const LOG_COLORS = {
 
 class Logger {
   constructor() {
-    this.fileWriteLog = !false;
+    this.logTerminal = false;
+    this.fileWriteLog = false;
     const envLevel = process.env.LOG_LEVEL;
     this.logLevel = LOG_LEVELS[envLevel] ? envLevel : "INFO";
     this.logDir = path.join(
-      process.cwd(),
+      ROOT_DIR,
       "storage",
       "logs",
       new Date().toISOString().split("T")[0],
@@ -74,7 +76,7 @@ class Logger {
     const formattedMessage = this.formatMessage(level, context, message, meta);
     const coloredMessage = `${LOG_COLORS[level]}${formattedMessage}${LOG_COLORS.RESET}`;
 
-    console.log(coloredMessage);
+    this.logTerminal && console.log(coloredMessage);
 
     this.writeToFile(formattedMessage);
   }

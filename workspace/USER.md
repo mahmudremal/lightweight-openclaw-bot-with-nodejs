@@ -1,25 +1,21 @@
-# User Profile
+# User
 
-## Basic Information
-
-- **Name**: (your name)
-- **Timezone**: (your timezone)
-- **Language**: (preferred language)
+Information about user goes here.
 
 ## Preferences
 
-- Communication style: casual
-- Response length: concise
-- Technical level: expert
+- Communication style: (casual/formal)
+- Timezone: (your timezone)
+- Language: (your preferred language)
 
-## Work Context
+## Personal Information
 
-- **Primary Role**: (your role)
-- **Main Projects**: (what you're working on)
-- **Tools You Use**: (IDEs, languages, frameworks)
+- Name: (optional)
+- Location: (optional)
+- Occupation: (optional)
 
-## Topics of Interest
+## Learning Goals
 
--
--
--
+- What the user wants to learn from AI
+- Preferred interaction style
+- Areas of interest

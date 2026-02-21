@@ -1,3 +1,8 @@
+/**
+ * Forany confusions, you can get idea how they created
+ * picoclaw-main\pkg\channels\whatsapp.go
+ */
+
 import pkg from "whatsapp-web.js";
 const { Client, LocalAuth } = pkg;
 import qrcode from "qrcode-terminal";
@@ -5,34 +10,40 @@ import path from "path";
 import fs from "fs-extra";
 import browser from "../utils/browser.js";
 import { processMessage } from "../core/agent.js";
+import logger from "../utils/logger.js";
+import { ROOT_DIR } from "../core/workspace.js";
+import { getActiveConfig } from "../config/index.js";
 
 let client = null;
 
 export async function startWhatsAppClient() {
   if (client) return client;
 
-  const storagePath = path.resolve(process.cwd(), "storage", "browser-data");
-  fs.ensureDirSync(storagePath);
+  const storagePath = path.resolve(ROOT_DIR, "storage", "browser-data");
+  await fs.ensureDir(storagePath);
 
   const browserInstance = await browser.getBrowser();
   const browserWSEndpoint = browserInstance.wsEndpoint();
+
+  const config = await getActiveConfig();
+
+  const puppeteerOpts = config.channels.whatsapp.puppeteer;
 
   client = new Client({
     authStrategy: new LocalAuth({ clientId: "romi", dataPath: storagePath }),
     authTimeoutMs: 120000,
     puppeteer: {
       browserWSEndpoint,
-      userAgent:
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+      ...puppeteerOpts,
     },
   });
 
   client.on("qr", (qr) => qrcode.generate(qr, { small: true }));
 
-  client.on("ready", () => console.log("WhatsApp client ready"));
+  client.on("ready", () => logger.log("WHATSAPP", "WhatsApp client ready"));
 
   client.on("auth_failure", (msg) =>
-    console.error("WhatsApp auth failure:", msg),
+    logger.error("WHATSAPP", "WhatsApp auth failure:", msg),
   );
 
   client.on("disconnected", (reason) =>
@@ -43,18 +54,18 @@ export async function startWhatsAppClient() {
     try {
       const from = `whatsapp:${msg.from}`;
       const body = msg.body || "";
-      console.log(`[WA] ${from} -> ${body}`);
+      logger.log("WHATSAPP", `[WA] ${from} -> ${body}`);
       const reply = await processMessage(body, { channel: "whatsapp", from });
       if (reply) await sendWhatsApp(from, reply);
     } catch (err) {
-      console.error("Error handling incoming WA message:", err);
+      logger.error("WHATSAPP", "Error handling incoming WA message:", err);
     }
   });
 
   await client
     .initialize()
     .catch((err) =>
-      console.error("Failed to initialize WhatsApp client:", err),
+      logger.error("WHATSAPP", "Failed to initialize WhatsApp client:", err),
     );
   return client;
 }
@@ -75,7 +86,7 @@ export async function sendWhatsApp(to, message) {
   try {
     return await client.sendMessage(chatId, message);
   } catch (err) {
-    console.error("sendWhatsApp error:", err.message);
+    logger.error("WHATSAPP", "sendWhatsApp error:", err.message);
     throw err;
   }
 }

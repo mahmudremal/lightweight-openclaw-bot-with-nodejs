@@ -1,9 +1,8 @@
-import fs from "fs-extra";
 import path from "path";
 import { getWorkspacePath, readWorkspaceFile } from "../core/workspace.js";
 import logger from "../utils/logger.js";
+import { getActiveConfig } from "../config/index.js";
 
-const HEARTBEAT_INTERVAL_MS = 30 * 60 * 1000;
 const HEARTBEAT_OK_TOKEN = "HEARTBEAT_OK";
 
 function isHeartbeatEmpty(content) {
@@ -19,21 +18,23 @@ function isHeartbeatEmpty(content) {
 }
 
 export class HeartbeatService {
-  constructor({
-    onHeartbeat,
-    intervalMs = HEARTBEAT_INTERVAL_MS,
-    enabled = true,
-  }) {
+  constructor({ onHeartbeat }) {
     this.onHeartbeat = onHeartbeat;
-    this.intervalMs = intervalMs;
-    this.enabled = enabled;
     this._timer = null;
+    this._config = null;
   }
 
-  start() {
-    if (!this.enabled) return;
-    this._timer = setInterval(() => this._tick(), this.intervalMs);
-    logger.info("HEARTBEAT", `Started (every ${this.intervalMs / 1000}s)`);
+  async start() {
+    this._config = await getActiveConfig();
+    const enabled = this._config.heartbeat?.enabled;
+    const intervalMs = (this._config.heartbeat?.interval || 30) * 60 * 1000;
+
+    if (!enabled) {
+        logger.info("HEARTBEAT", "Heartbeat service is disabled in config.");
+        return;
+    }
+    this._timer = setInterval(() => this._tick(), intervalMs);
+    logger.info("HEARTBEAT", `Started (every ${intervalMs / 1000}s)`);
   }
 
   stop() {
@@ -41,6 +42,7 @@ export class HeartbeatService {
       clearInterval(this._timer);
       this._timer = null;
     }
+    this._config = null;
   }
 
   async _tick() {

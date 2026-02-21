@@ -4,10 +4,18 @@ This file stores important information that should persist across sessions.
 
 ## User Information
 
+(Important facts about user)
+
 ## Preferences
 
-## Project Context
+(User preferences learned over time)
 
 ## Important Notes
 
-- [2026-02-16] I'm Remal Mahmud, a senior software engineer
+(Things to remember)
+
+## Configuration
+
+- Model preferences
+- Channel settings
+- Skills enabled

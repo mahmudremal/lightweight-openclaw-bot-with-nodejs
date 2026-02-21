@@ -1,8 +1,9 @@
 import puppeteer from "puppeteer";
-import { config } from "../config/index.js";
+import { getActiveConfig } from "../config/index.js"; // Import getActiveConfig
 import logger from "./logger.js";
 import path from "path";
 import fs from "fs";
+import { ROOT_DIR } from "../core/workspace.js";
 
 class Browser {
   currentInstance = null;
@@ -11,17 +12,21 @@ class Browser {
   async setup_browser() {
     logger.info("BROWSER", "Launching shared browser instance...");
 
-    const userDataDir = path.resolve(process.cwd(), "storage", "browser-data");
+    const userDataDir = path.resolve(ROOT_DIR, "storage", "browser-data");
     if (!fs.existsSync(userDataDir)) {
       fs.mkdirSync(userDataDir, { recursive: true });
     }
 
+    const config = await getActiveConfig(); // Get the active config
+
+    const puppeteerConfig = config.channels.whatsapp.puppeteer || {}; // Get puppeteer config for whatsapp channel
+
     this.currentInstance = await puppeteer.launch({
-      executablePath: config.puppeteer.browserPath,
+      executablePath: puppeteerConfig.browserPath || null, // Use config value
       userDataDir: userDataDir,
       defaultViewport: null,
-      headless: config.puppeteer.headless ? "new" : false,
-      args: [
+      headless: puppeteerConfig.headless ? "new" : false, // Use config value
+      args: puppeteerConfig.args || [ // Use args from config, or default if not specified
         "--no-sandbox",
         "--disable-setuid-sandbox",
         "--disable-dev-shm-usage",

@@ -1,6 +1,7 @@
 import express from "express";
 import bodyParser from "body-parser";
 import { processMessage } from "./core/agent.js";
+import logger from "./utils/logger.js";
 
 export function startServer(port = 8123) {
   const app = express();
@@ -8,7 +9,11 @@ export function startServer(port = 8123) {
   app.use(bodyParser.json());
 
   app.get("/health", (req, res) =>
-    res.json({ ok: true, time: new Date().toISOString() }),
+    res.json({
+      ok: true,
+      time: new Date().toISOString(),
+      uptime: process.uptime(),
+    }),
   );
 
   app.post("/webhook/message", async (req, res) => {
@@ -25,6 +30,6 @@ export function startServer(port = 8123) {
   });
 
   app.listen(port, () => {
-    console.log(`Romi server listening on port ${port}`);
+    logger.log("SERVER", `Romi server listening on port ${port}`);
   });
 }

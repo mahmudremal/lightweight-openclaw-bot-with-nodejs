@@ -1,30 +1,42 @@
-import dotenv from "dotenv";
-dotenv.config();
-
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
-const OPENAI_API_BASE_URL =
-  process.env.OPENAI_API_BASE_URL || "https://api.openai.com/v1";
-
-if (!OPENAI_API_KEY && OPENAI_API_BASE_URL.includes("api.openai.com")) {
-  console.warn("Warning: OPENAI_API_KEY not set.");
-}
+import { getActiveConfig } from "../config/index.js";
 
 export async function openaiCreateChatCompletion({
   messages,
-  model = process.env.LLM_MODEL_NAME || "romi",
-  temperature = 0.2,
-  max_tokens = 500,
+  model,
+  temperature,
+  max_tokens,
 }) {
-  if (!OPENAI_API_KEY && OPENAI_API_BASE_URL.includes("api.openai.com"))
-    throw new Error("OPENAI_API_KEY is required for official OpenAI API");
+  const config = await getActiveConfig();
 
-  const resp = await fetch(`${OPENAI_API_BASE_URL}/chat/completions`, {
+  const API_KEY = config.providers.openai.api_key;
+  const API_BASE_URL = config.providers.openai.api_base;
+
+  const defaultModel = config.agents.defaults?.model || "gpt-3.5-turbo";
+  const defaultTemperature = config.agents.defaults?.temperature || 0.2;
+  const defaultMaxTokens = config.agents.defaults?.max_tokens || 500;
+
+  const finalModel = model || defaultModel;
+  const finalTemperature = temperature || defaultTemperature;
+  const finalMaxTokens = max_tokens || defaultMaxTokens;
+
+  if (!API_KEY && API_BASE_URL.includes("api.openai.com")) {
+    console.warn("Warning: OpenAI API key not set in config.");
+  }
+
+  console.log(messages.map(({ content }) => content).join("\n\n"));
+
+  const resp = await fetch(`${API_BASE_URL}/chat/completions`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${OPENAI_API_KEY || "dummy"}`,
+      Authorization: `Bearer ${API_KEY || "dummy"}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ model, messages, temperature, max_tokens }),
+    body: JSON.stringify({
+      model: finalModel,
+      messages,
+      temperature: finalTemperature,
+      max_tokens: finalMaxTokens,
+    }),
     timeout: 120000,
   });
 
