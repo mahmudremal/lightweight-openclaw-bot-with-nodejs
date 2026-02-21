@@ -87,16 +87,31 @@ export function writeWorkspaceFile(
 }
 
 export function loadAgentContext(workspaceId = activeWorkspaceId) {
-  const parts = fs
-    .readdirSync(getWorkspacePath(workspaceId))
-    .filter((i) => i.endsWith(".md"))
-    .map((f) =>
-      fs.readFileSync(path.join(getWorkspacePath(workspaceId), f), "utf8"),
-    );
+  const workspacePath = getWorkspacePath(workspaceId);
+  if (!fs.existsSync(workspacePath)) return "";
 
-  const memory = readWorkspaceFile("memory/MEMORY.md", workspaceId);
+  const files = fs.readdirSync(workspacePath).filter((i) => i.endsWith(".md"));
 
-  if (memory) parts.push(memory);
+  // Sort files: TOOLS.md first, then others
+  const sortedFiles = files.sort((a, b) => {
+    if (a.toLowerCase() === "tools.md") return -1;
+    if (b.toLowerCase() === "tools.md") return 1;
+    return a.localeCompare(b);
+  });
+
+  const parts = sortedFiles.map((f) => {
+    const content = fs.readFileSync(path.join(workspacePath, f), "utf8");
+    return `### File: ${f}\n\n${content}`;
+  });
+
+  const memoryPath = path.join(workspacePath, "memory", "MEMORY.md");
+  if (fs.existsSync(memoryPath)) {
+    const memory = fs.readFileSync(memoryPath, "utf8");
+    if (memory.trim()) {
+      parts.push(`### File: memory/MEMORY.md\n\n${memory}`);
+    }
+  }
+
   return parts.join("\n\n---\n\n");
 }
 

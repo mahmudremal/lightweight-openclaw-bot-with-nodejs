@@ -1,5 +1,4 @@
 import { performSearch } from "../tools/duckduckgo.js";
-import { readLongTermMemory, writeLongTermMemory } from "./memory.js";
 import { getWorkspacePath } from "./workspace.js";
 import fs from "fs-extra";
 import path from "path";
@@ -7,74 +6,94 @@ import logger from "../utils/logger.js";
 import { sendWhatsApp } from "../channels/whatsapp.js";
 
 export async function dispatchToolCall(json) {
+  const workspacePath = getWorkspacePath();
+
   // Search tool
   if (json.tool === "search" && json.args?.query) {
     const items = await performSearch(json.args.query);
-    return items.slice(0, 5).map((r, i) => `${i+1}. ${r.title}\n${r.url}`).join("\n\n");
-  }
-
-  // Remember tool (writes to MEMORY.md)
-  if (json.tool === "remember" && json.args?.content) {
-    const existing = readLongTermMemory();
-    const timestamp = new Date().toISOString().split("T")[0];
-    const newEntry = `\n- [${timestamp}] ${json.args.content}`;
-    const updated = existing.trimEnd() + newEntry + "\n";
-    writeLongTermMemory(updated);
-    return `✅ Saved to MEMORY.md: ${json.args.content}`;
-  }
-
-  // Recall tool
-  if (json.tool === "recall") {
-    const memory = readLongTermMemory();
-    return memory && memory.trim() !== "# Long-term Memory"
-      ? `Here's what I remember:\n\n${memory}`
-      : "No memories stored yet.";
-  }
-
-  // Update SOUL.md via write_file
-  if (json.tool === "update_soul" && json.args?.content) {
-    const filePath = path.join(getWorkspacePath(), "SOUL.md");
-    await fs.writeFile(filePath, json.args.content, "utf8");
-    return `✅ Updated SOUL.md`;
-  }
-
-  // Update USER.md via write_file
-  if (json.tool === "update_user_profile" && json.args?.content) {
-    const filePath = path.join(getWorkspacePath(), "USER.md");
-    await fs.writeFile(filePath, json.args.content, "utf8");
-    return `✅ Updated USER.md`;
+    return items
+      .slice(0, 5)
+      .map((r, i) => `${i + 1}. ${r.title}\n${r.url}`)
+      .join("\n\n");
   }
 
   // Read file directly
   if (json.tool === "read_file" && json.args?.path) {
-    const filePath = path.join(getWorkspacePath(), json.args.path);
-    if (!filePath.startsWith(getWorkspacePath())) return "❌ Access denied";
+    const filePath = path.resolve(workspacePath, json.args.path);
+    if (!filePath.startsWith(workspacePath)) return "❌ Access denied";
+    if (!fs.existsSync(filePath)) return "❌ File does not exist";
     const content = await fs.readFile(filePath, "utf8");
     return `📄 Content of '${json.args.path}':\n${content}`;
   }
 
   // Write file directly
-  if (json.tool === "write_file" && json.args?.path && json.args?.content !== undefined) {
-    const filePath = path.join(getWorkspacePath(), json.args.path);
-    if (!filePath.startsWith(getWorkspacePath())) return "❌ Access denied";
+  if (
+    json.tool === "write_file" &&
+    json.args?.path &&
+    json.args?.content !== undefined
+  ) {
+    const filePath = path.resolve(workspacePath, json.args.path);
+    if (!filePath.startsWith(workspacePath)) return "❌ Access denied";
     await fs.ensureDir(path.dirname(filePath));
     await fs.writeFile(filePath, json.args.content, "utf8");
     return `✅ Wrote to '${json.args.path}'`;
   }
 
   // Append to file directly
-  if (json.tool === "append_file" && json.args?.path && json.args?.content !== undefined) {
-    const filePath = path.join(getWorkspacePath(), json.args.path);
-    if (!filePath.startsWith(getWorkspacePath())) return "❌ Access denied";
+  if (
+    json.tool === "append_file" &&
+    json.args?.path &&
+    json.args?.content !== undefined
+  ) {
+    const filePath = path.resolve(workspacePath, json.args.path);
+    if (!filePath.startsWith(workspacePath)) return "❌ Access denied";
     await fs.ensureDir(path.dirname(filePath));
     await fs.appendFile(filePath, json.args.content, "utf8");
     return `✅ Appended to '${json.args.path}'`;
   }
 
-  // Send WhatsApp message
-  if (json.tool === "send_whatsapp_message" && json.args?.to && json.args?.message) {
-    await sendWhatsApp(json.args.to, json.args.message);
-    return `✅ Sent WhatsApp to ${json.args.to}`;
+  // Read directory
+  if (json.tool === "read_dir") {
+    const dirPath = path.resolve(workspacePath, json.args?.path || ".");
+    if (!dirPath.startsWith(workspacePath)) return "❌ Access denied";
+    if (!fs.existsSync(dirPath)) return "❌ Directory does not exist";
+    const files = await fs.readdir(dirPath);
+    return `📁 Content of '${json.args?.path || "."}':\n${files.join("\n")}`;
+  }
+
+  // Generic send_message
+  if (
+    json.tool === "send_message" &&
+    json.args?.channel &&
+    json.args?.to &&
+    json.args?.message
+  ) {
+    const { channel, to, message } = json.args;
+    if (channel === "whatsapp") {
+      await sendWhatsApp(to, message);
+      return `✅ Sent WhatsApp message to ${to}`;
+    }
+    // Add other channels here (telegram, etc.)
+    return `❌ Channel ${channel} not supported or implemented yet.`;
+  }
+
+  // Generic get_chats
+  if (json.tool === "get_chats" && json.args?.channel) {
+    const { channel } = json.args;
+    if (channel === "whatsapp") {
+      // return a placeholder for now or implement if whatsapp.js supports it
+      return "✅ Requested chat list for WhatsApp. (Functionality coming soon)";
+    }
+    return `❌ Channel ${channel} not supported or implemented yet.`;
+  }
+
+  // Generic get_messages
+  if (json.tool === "get_messages" && json.args?.channel && json.args?.chatId) {
+    const { channel, chatId } = json.args;
+    if (channel === "whatsapp") {
+      return `✅ Requested messages for chat ${chatId} on WhatsApp. (Functionality coming soon)`;
+    }
+    return `❌ Channel ${channel} not supported or implemented yet.`;
   }
 
   return `❌ Unknown tool: ${json.tool}`;

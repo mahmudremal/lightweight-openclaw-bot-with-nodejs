@@ -3,3 +3,6 @@ dist/
 .env
 storage/
 wa-session/
+picoclaw-main/
+/.wwebjs_cache
+/.claude

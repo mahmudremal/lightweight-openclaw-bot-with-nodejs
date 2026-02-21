@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { Command } from "commander";
 import dotenv from "dotenv";
+import Table from "cli-table3";
 dotenv.config();
 
 import { startServer } from "../src/server.js";
@@ -23,6 +24,11 @@ import {
   installSkill,
   removeSkill,
 } from "../src/core/skillManager.js";
+import {
+  listProviders,
+  addProvider,
+  toggleProvider,
+} from "../src/core/providerManager.js";
 import browser from "../src/utils/browser.js";
 import logger from "../src/utils/logger.js";
 import readline from "readline";
@@ -244,106 +250,115 @@ program
     }
   });
 
-program
+const skills = program
   .command("skills")
-  .description("Manage skills in the current workspace")
-  .addCommand(
-    new Command("list")
-      .description("List skills")
-      .option(
-        "-i, --installed",
-        "List skills installed in the active workspace (default lists installable skills)",
-      )
-      .action(async (opts) => {
-        const activeWorkspaceId = getActiveWorkspaceId();
-        logger.info("ROMI", `Active workspace: ${activeWorkspaceId}`);
+  .description("Manage skills in the current workspace");
 
-        if (opts.installed) {
-          // If --installed is specified, list installed skills
-          logger.info(
-            "ROMI",
-            `\n--- Skills Installed in '${activeWorkspaceId}' Workspace ---`,
-          );
-          const installedSkills = await getWorkspaceSkills(activeWorkspaceId);
-          if (installedSkills.length === 0) {
-            logger.info(
-              "ROMI",
-              `No skills installed in workspace '${activeWorkspaceId}'.`,
-            );
-            logger.info(
-              "ROMI",
-              "Use 'romi skills list' to see available skills, and 'romi skills install <name>' to install them.",
-            );
-          } else {
-            installedSkills.forEach((skill) => {
-              logger.info(
-                "ROMI",
-                `  ${skill.name} ${skill.emoji || ""} - ${skill.description}`,
-              );
-            });
-          }
-        } else {
-          // Default behavior: list installable skills
-          logger.info("ROMI", "\n--- All Installable Skills (Repository) ---");
-          const installableSkills = await getInstallableSkills();
-          if (installableSkills.length === 0) {
-            logger.info(
-              "ROMI",
-              "No installable skills found in the repository.",
-            );
-          } else {
-            installableSkills.forEach((skill) => {
-              logger.info(
-                "ROMI",
-                `  ${skill.name} ${skill.emoji || ""} - ${skill.description}`,
-              );
-            });
-          }
-        }
-        process.exit(0);
-      }),
-  )
-  .addCommand(
-    new Command("install <skillName>")
-      .description("Install a skill into the active workspace")
-      .action(async (skillName) => {
-        console.log(skillName);
-        const activeWorkspaceId = getActiveWorkspaceId();
-        try {
-          const result = await installSkill(skillName, activeWorkspaceId);
-          logger.log("ROMI", result);
-          logger.log(
-            "ROMI",
-            `Skill '${skillName}' installed in workspace '${activeWorkspaceId}'. Don't forget to update your config if needed!`,
-          );
-        } catch (error) {
-          logger.error(
-            "ROMI",
-            `Failed to install skill '${skillName}': ${error.message}`,
-          );
-          process.exit(1);
-        }
-        process.exit(0);
-      }),
-  )
-  .addCommand(
-    new Command("remove <skillName>")
-      .description("Remove a skill from the active workspace")
-      .action(async (skillName) => {
-        const activeWorkspaceId = getActiveWorkspaceId();
-        try {
-          const result = await removeSkill(skillName, activeWorkspaceId);
-          logger.log("ROMI", result);
-        } catch (error) {
-          logger.error(
-            "ROMI",
-            `Failed to remove skill '${skillName}': ${error.message}`,
-          );
-          process.exit(1);
-        }
-        process.exit(0);
-      }),
-  );
+skills
+  .command("list")
+  .description("List all skills")
+  .action(async () => {
+    const installable = await getInstallableSkills();
+    const table = new Table({ head: ["Name", "Emoji", "Description"] });
+    installable.forEach((s) =>
+      table.push([s.name, s.emoji || "", s.description]),
+    );
+    console.log(table.toString());
+    process.exit(0);
+  });
+
+skills
+  .command("installed")
+  .description("List installed skills")
+  .action(async () => {
+    const activeWorkspaceId = getActiveWorkspaceId();
+    const installed = await getWorkspaceSkills(activeWorkspaceId);
+    if (installed.length === 0) {
+      logger.info(
+        "ROMI",
+        `No skills installed in workspace '${activeWorkspaceId}'.`,
+      );
+    } else {
+      const table = new Table({ head: ["Name", "Emoji", "Description"] });
+      installed.forEach((s) =>
+        table.push([s.name, s.emoji || "", s.description]),
+      );
+      console.log(table.toString());
+    }
+    process.exit(0);
+  });
+
+skills
+  .command("available")
+  .description("List available skills not yet installed")
+  .action(async () => {
+    const activeWorkspaceId = getActiveWorkspaceId();
+    const installed = await getWorkspaceSkills(activeWorkspaceId);
+    const all = await getInstallableSkills();
+    const installedNames = installed.map((s) => s.name);
+    const available = all.filter((s) => !installedNames.includes(s.name));
+    const table = new Table({ head: ["Name", "Emoji", "Description"] });
+    available.forEach((s) =>
+      table.push([s.name, s.emoji || "", s.description]),
+    );
+    console.log(table.toString());
+    process.exit(0);
+  });
+
+skills
+  .command("install <skillName>")
+  .description("Install a skill")
+  .action(async (skillName) => {
+    const activeWorkspaceId = getActiveWorkspaceId();
+    try {
+      const result = await installSkill(skillName, activeWorkspaceId);
+      logger.log("ROMI", result);
+    } catch (error) {
+      logger.error("ROMI", `Failed to install: ${error.message}`);
+    }
+    process.exit(0);
+  });
+
+skills
+  .command("remove <skillName>")
+  .description("Remove a skill")
+  .action(async (skillName) => {
+    const activeWorkspaceId = getActiveWorkspaceId();
+    try {
+      const result = await removeSkill(skillName, activeWorkspaceId);
+      logger.log("ROMI", result);
+    } catch (error) {
+      logger.error("ROMI", `Failed to remove: ${error.message}`);
+    }
+    process.exit(0);
+  });
+
+// Providers management
+const providers = program
+  .command("providers")
+  .description("Manage message providers (active/inactive)");
+
+providers
+  .command("list")
+  .description("List all message providers")
+  .action(async () => {
+    const list = await listProviders();
+    const table = new Table({ head: ["Name", "Status"] });
+    list.forEach((p) =>
+      table.push([p.name, p.active ? "Active ✅" : "Inactive ❌"]),
+    );
+    console.log(table.toString());
+    process.exit(0);
+  });
+
+providers
+  .command("add <name>")
+  .description("Add/Activate a provider")
+  .action(async (name) => {
+    const result = await addProvider(name);
+    logger.info("ROMI", result);
+    process.exit(0);
+  });
 
 program
   .command("init [dir]")
