@@ -1,1 +1,78 @@
-{}
+{
+  "gateway": {
+    "host": "0.0.0.0",
+    "port": 8123
+  },
+  "agents": {
+    "defaults": {
+      "workspace": "default",
+      "restrict_to_workspace": true,
+      "provider": "openai",
+      "model": "qwen3:0.6b",
+      "max_tokens": 8192,
+      "temperature": 0.7,
+      "max_tool_iterations": 20,
+      "puppeteer": {
+        "browserPath": "C:\\Users\\Lenovo\\.cache\\puppeteer\\chrome\\win64-121.0.6167.85\\chrome-win64\\chrome.exe",
+        "headless": "new",
+        "args": [
+          "--no-sandbox",
+          "--disable-setuid-sandbox",
+          "--disable-dev-shm-usage",
+          "--disable-web-security",
+          "--disable-session-crashed-bubble",
+          "--disable-restore-session-state",
+          "--no-first-run",
+          "--no-default-browser-check",
+          "--disable-gpu",
+          "--disable-background-networking",
+          "--disable-sync",
+          "--metrics-recording-only",
+          "--disable-features=IsolateOrigins,site-per-process,Translate,BackForwardCache",
+          "--disable-blink-features=AutomationControlled"
+        ]
+      }
+    }
+  },
+  "channels": {
+    "whatsapp": {
+      "enabled": true,
+      "provider": "whatsapp-web.js",
+      "bridge_url": "ws://localhost:3001",
+      "allow_from": ["+8801814118328"]
+    },
+    "telegram": {
+      "enabled": true,
+      "token": "8158911111:AAGHEnBWBUmIwBeoz9VY9wstNyMMza8WqcA",
+      "proxy": "",
+      "allow_from": ["@mahmudremal"]
+    }
+  },
+  "providers": {
+    "openai": {
+      "api_key": "sk-your-key-goes-here",
+      "api_base": "http://localhost:11434/v1"
+    },
+    "gemini": {
+      "api_key": "",
+      "api_base": ""
+    }
+  },
+  "tools": {
+    "duckduckgo": {
+      "enabled": true,
+      "max_results": 5
+    },
+    "websearch": {
+      "enabled": true
+    },
+    "fetch": {
+      "enabled": true
+    }
+  },
+  "heartbeat": {
+    "enabled": true,
+    "interval": 30
+  },
+  "cron": []
+}

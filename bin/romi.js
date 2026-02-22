@@ -312,6 +312,7 @@ skills
     const activeWorkspaceId = getActiveWorkspaceId();
     try {
       const result = await installSkill(skillName, activeWorkspaceId);
+      console.log(result);
       logger.log("ROMI", result);
     } catch (error) {
       logger.error("ROMI", `Failed to install: ${error.message}`);

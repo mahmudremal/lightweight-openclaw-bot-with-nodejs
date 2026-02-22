@@ -90,27 +90,45 @@ export function loadAgentContext(workspaceId = activeWorkspaceId) {
   const workspacePath = getWorkspacePath(workspaceId);
   if (!fs.existsSync(workspacePath)) return "";
 
-  const files = fs.readdirSync(workspacePath).filter((i) => i.endsWith(".md"));
+  let files = fs.readdirSync(workspacePath).filter((i) => i.endsWith(".md"));
+  // here i think we need to do a thing (maybe), like if `BOOTSTRAP.md` file exists, that means we need to focus on that like so like reducing some files will solve token burns and focus on getting information about him? see below i tried a bit
+  if (files.includes("BOOTSTRAP.md")) {
+    files = files.filter((f) => !["SKILLS.md", "HEARTBEAT.md"].includes(f));
+  }
 
-  // Sort files: TOOLS.md first, then others
+  const toSortList = [
+    "BOOTSTRAP.md",
+    "AGENT.md",
+    "IDENTITY.md",
+    "SOUL.md",
+    "SKILLS.md",
+    "TOOLS.md",
+    "USER.md",
+    "HEARTBEAT.md",
+    "memory/MEMORY.md",
+    // this is my prediction if it's work better but upto you decide.
+  ];
+  // Sort files based on toSortList
   const sortedFiles = files.sort((a, b) => {
-    if (a.toLowerCase() === "tools.md") return -1;
-    if (b.toLowerCase() === "tools.md") return 1;
+    const indexA = toSortList.indexOf(a);
+    const indexB = toSortList.indexOf(b);
+
+    if (indexA !== -1 && indexB !== -1) return indexA - indexB;
+    if (indexA !== -1) return -1;
+    if (indexB !== -1) return 1;
+
     return a.localeCompare(b);
   });
 
-  const parts = sortedFiles.map((f) => {
-    const content = fs.readFileSync(path.join(workspacePath, f), "utf8");
-    return `### File: ${f}\n\n${content}`;
-  });
-
-  const memoryPath = path.join(workspacePath, "memory", "MEMORY.md");
-  if (fs.existsSync(memoryPath)) {
-    const memory = fs.readFileSync(memoryPath, "utf8");
-    if (memory.trim()) {
-      parts.push(`### File: memory/MEMORY.md\n\n${memory}`);
-    }
-  }
+  const parts = sortedFiles
+    .map((f) => {
+      const content = fs.readFileSync(path.join(workspacePath, f), "utf8");
+      if (content.trim()) {
+        return content;
+      }
+      return null;
+    })
+    .filter((c) => c);
 
   return parts.join("\n\n---\n\n");
 }

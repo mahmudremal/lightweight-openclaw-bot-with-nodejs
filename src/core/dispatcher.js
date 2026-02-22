@@ -4,6 +4,7 @@ import fs from "fs-extra";
 import path from "path";
 import logger from "../utils/logger.js";
 import { sendWhatsApp } from "../channels/whatsapp.js";
+import axios from "axios";
 
 export async function dispatchToolCall(json) {
   const workspacePath = getWorkspacePath();
@@ -96,5 +97,146 @@ export async function dispatchToolCall(json) {
     return `❌ Channel ${channel} not supported or implemented yet.`;
   }
 
+  // HTTP Request tool
+  if (json.tool === "request" && json.args?.url) {
+    const { url, method = "get", data, headers } = json.args;
+    try {
+      const response = await axios({
+        url,
+        method,
+        data,
+        headers,
+        timeout: 10000,
+      });
+      if (typeof response.data === "object") {
+        return JSON.stringify(response.data, null, 2);
+      }
+      return String(response.data);
+    } catch (error) {
+      return `❌ Request failed: ${error.message}${error.response ? `\nResponse: ${JSON.stringify(error.response.data)}` : ""}`;
+    }
+  }
+
   return `❌ Unknown tool: ${json.tool}`;
+}
+
+export function getToolsSchema() {
+  return [
+    {
+      type: "function",
+      function: {
+        name: "search",
+        description: "Search the web using DuckDuckGo",
+        parameters: {
+          type: "object",
+          properties: {
+            query: { type: "string" },
+          },
+          required: ["query"],
+        },
+      },
+    },
+    {
+      type: "function",
+      function: {
+        name: "read_file",
+        description: "Read the content of a file from the workspace",
+        parameters: {
+          type: "object",
+          properties: {
+            path: {
+              type: "string",
+              description: "Path relative to the workspace",
+            },
+          },
+          required: ["path"],
+        },
+      },
+    },
+    {
+      type: "function",
+      function: {
+        name: "write_file",
+        description:
+          "Write content to a file in the workspace (overwrites existing)",
+        parameters: {
+          type: "object",
+          properties: {
+            path: { type: "string" },
+            content: { type: "string" },
+          },
+          required: ["path", "content"],
+        },
+      },
+    },
+    {
+      type: "function",
+      function: {
+        name: "append_file",
+        description: "Append content to a file in the workspace",
+        parameters: {
+          type: "object",
+          properties: {
+            path: { type: "string" },
+            content: { type: "string" },
+          },
+          required: ["path", "content"],
+        },
+      },
+    },
+    {
+      type: "function",
+      function: {
+        name: "read_dir",
+        description: "List files in a directory",
+        parameters: {
+          type: "object",
+          properties: {
+            path: {
+              type: "string",
+              description: "Directory path relative to workspace",
+            },
+          },
+          required: ["path"],
+        },
+      },
+    },
+    {
+      type: "function",
+      function: {
+        name: "send_message",
+        description: "Send a message via a communication channel",
+        parameters: {
+          type: "object",
+          properties: {
+            channel: { type: "string", enum: ["whatsapp"] },
+            to: { type: "string", description: "Recipient identifier" },
+            message: { type: "string" },
+          },
+          required: ["channel", "to", "message"],
+        },
+      },
+    },
+    {
+      type: "function",
+      function: {
+        name: "request",
+        description: "Make an HTTP request (replaces curl)",
+        parameters: {
+          type: "object",
+          properties: {
+            url: { type: "string" },
+            method: {
+              type: "string",
+              enum: ["get", "post", "put", "delete"],
+              default: "get",
+            },
+            data: { type: "object", description: "Request payload" },
+            headers: { type: "object", description: "HTTP headers" },
+          },
+          required: ["url"],
+        },
+      },
+    },
+  ];
 }

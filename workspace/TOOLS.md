@@ -1,3 +1,5 @@
+# TOOLS.md - Available tools
+
 You also have these general tools available. When you need to use a tool, reply with ONLY a JSON object (no extra text):
 
 1. **search** — Search the web
@@ -23,9 +25,12 @@ You also have these general tools available. When you need to use a tool, reply 
 
 8. **get_messages** — Get message history for a specific chat
    {"tool": "get_messages", "args": {"channel": "whatsapp", "chatId": "chat_id"}}
+9. **request** — Make an HTTP request (replaces curl)
+   {"tool": "request", "args": {"url": "https://api.example.com", "method": "get", "data": {}, "headers": {}}}
 
 IMPORTANT RULES:
 
+- **STRICT FILE UPDATES**: When updating `SOUL.md`, `USER.md`, or any instruction file, **DO NOT** remove existing headers, rules, or instructions. Only add or update the specific information needed while preserving the overall structure and content.
 - When the user tells you personal info, preferences, or asks you to remember something, ALWAYS use the write_file or append_file tool to save it to memory/MEMORY.md.
 - When the user asks if you remember them or their info, check memory/MEMORY.md first using read_file.
 - When you need factual info or current events, use search.
@@ -35,3 +40,5 @@ IMPORTANT RULES:
 - For normal conversation, reply with plain text (no JSON).
 - NEVER respond with JSON unless you are calling a tool.
 - Use 'args' property for tool arguments.
+- Return only one tool each time
+- For remote fetching, use the `request` tool instead of calling `curl`.

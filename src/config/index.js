@@ -6,70 +6,11 @@ import {
   getActiveWorkspaceId,
 } from "../core/workspace.js";
 
-const DEFAULT_GLOBAL_CONFIG = {
-  gateway: {
-    host: "0.0.0.0",
-    port: 8123,
-  },
-  agents: {
-    defaults: {
-      workspace: "default",
-      restrict_to_workspace: true,
-      provider: "openai",
-      model: "qwen3:0.6b",
-      max_tokens: 8192,
-      temperature: 0.7,
-      max_tool_iterations: 20,
-      browser:
-        "C:\\Users\\Lenovo\\.cache\\puppeteer\\chrome\\win64-121.0.6167.85\\chrome-win64\\chrome.exe",
-    },
-  },
-  channels: {
-    whatsapp: {
-      provider: "whatsapp-web.js",
-      enabled: true,
-      bridge_url: "ws://localhost:3001",
-      allow_from: ["+8801814118328"],
-      puppeteer: {
-        headless: true,
-        args: [],
-      },
-    },
-    telegram: {
-      enabled: true,
-      token: "8158911111:AAGHEnBWBUmIwBeoz9VY9wstNyMMza8WqcA",
-      proxy: "",
-      allow_from: ["@mahmudremal"],
-    },
-  },
-  providers: {
-    openai: {
-      api_key: "sk-your-key-goes-here",
-      api_base: "http://localhost:11434/v1",
-    },
-    gemini: {
-      api_key: "",
-      api_base: "",
-    },
-  },
-  tools: {
-    duckduckgo: {
-      enabled: true,
-      max_results: 5,
-    },
-    websearch: {
-      enabled: true,
-    },
-    fetch: {
-      enabled: true,
-    },
-  },
-  heartbeat: {
-    enabled: true,
-    interval: 30,
-  },
-  cron: [],
-};
+export const PROJECT_APPLICATION_DIR = "D:\workspace\remal-bot";
+
+const DEFAULT_GLOBAL_CONFIG = JSON.parse(
+  fs.readFileSync(path.resolve(".romi", "config.json")),
+);
 
 function mergeDeep(target, source) {
   const output = { ...target };
@@ -140,10 +81,10 @@ async function loadWorkspaceConfig(workspaceId) {
       workspaceConfig = {};
     }
   } else {
-    await fs.writeJson(workspaceConfigPath, {}, { spaces: 2 });
-    console.log(
-      `Created empty workspace config.json for '${workspaceId}' at ${workspaceConfigPath}`,
-    );
+    // await fs.writeJson(workspaceConfigPath, {}, { spaces: 2 });
+    // console.log(
+    //   `Created empty workspace config.json for '${workspaceId}' at ${workspaceConfigPath}`,
+    // );
   }
   return workspaceConfig;
 }

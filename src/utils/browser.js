@@ -3,7 +3,7 @@ import { getActiveConfig } from "../config/index.js"; // Import getActiveConfig
 import logger from "./logger.js";
 import path from "path";
 import fs from "fs";
-import { ROOT_DIR } from "../core/workspace.js";
+import { getActiveWorkspaceId, ROOT_DIR } from "../core/workspace.js";
 
 class Browser {
   currentInstance = null;
@@ -19,29 +19,15 @@ class Browser {
 
     const config = await getActiveConfig(); // Get the active config
 
-    const puppeteerConfig = config.channels.whatsapp.puppeteer || {}; // Get puppeteer config for whatsapp channel
+    const puppeteerConfig =
+      config.agents?.[getActiveWorkspaceId()]?.puppeteer || {};
 
     this.currentInstance = await puppeteer.launch({
       executablePath: puppeteerConfig.browserPath || null, // Use config value
       userDataDir: userDataDir,
       defaultViewport: null,
-      headless: puppeteerConfig.headless ? "new" : false, // Use config value
-      args: puppeteerConfig.args || [ // Use args from config, or default if not specified
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-        "--disable-dev-shm-usage",
-        "--disable-web-security",
-        "--disable-session-crashed-bubble",
-        "--disable-restore-session-state",
-        "--no-first-run",
-        "--no-default-browser-check",
-        "--disable-gpu",
-        "--disable-background-networking",
-        "--disable-sync",
-        "--metrics-recording-only",
-        "--disable-features=IsolateOrigins,site-per-process,Translate,BackForwardCache",
-        "--disable-blink-features=AutomationControlled",
-      ],
+      headless: puppeteerConfig?.headless ?? false, // Use config value //
+      args: puppeteerConfig.args || [],
     });
 
     this.currentInstance._realClose = this.currentInstance.close;

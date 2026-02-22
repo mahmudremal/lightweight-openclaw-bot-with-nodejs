@@ -25,8 +25,8 @@ const LOG_COLORS = {
 
 class Logger {
   constructor() {
-    this.logTerminal = false;
-    this.fileWriteLog = false;
+    this.logTerminal = !false;
+    this.fileWriteLog = !false;
     const envLevel = process.env.LOG_LEVEL;
     this.logLevel = LOG_LEVELS[envLevel] ? envLevel : "INFO";
     this.logDir = path.join(

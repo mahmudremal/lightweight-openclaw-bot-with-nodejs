@@ -1,10 +1,12 @@
 import { getActiveConfig } from "../config/index.js";
+import logger from "../utils/logger.js";
 
 export async function openaiCreateChatCompletion({
   messages,
   model,
   temperature,
   max_tokens,
+  tools,
 }) {
   const config = await getActiveConfig();
 
@@ -19,11 +21,16 @@ export async function openaiCreateChatCompletion({
   const finalTemperature = temperature || defaultTemperature;
   const finalMaxTokens = max_tokens || defaultMaxTokens;
 
-  if (!API_KEY && API_BASE_URL.includes("api.openai.com")) {
-    console.warn("Warning: OpenAI API key not set in config.");
-  }
+  const body = {
+    temperature: finalTemperature,
+    max_tokens: finalMaxTokens,
+    model: finalModel,
+    messages,
+  };
 
-  console.log(messages.map(({ content }) => content).join("\n\n"));
+  if (tools && tools.length > 0) {
+    body.tools = tools;
+  }
 
   const resp = await fetch(`${API_BASE_URL}/chat/completions`, {
     method: "POST",
@@ -31,12 +38,7 @@ export async function openaiCreateChatCompletion({
       Authorization: `Bearer ${API_KEY || "dummy"}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({
-      model: finalModel,
-      messages,
-      temperature: finalTemperature,
-      max_tokens: finalMaxTokens,
-    }),
+    body: JSON.stringify(body),
     timeout: 120000,
   });
 
@@ -46,5 +48,7 @@ export async function openaiCreateChatCompletion({
   }
 
   const data = await resp.json();
-  return data.choices?.[0]?.message?.content;
+  const message = data.choices?.[0]?.message;
+  logger.info("LLM", JSON.stringify(data));
+  return message;
 }

@@ -1,11 +1,20 @@
 import fs from "fs-extra";
 import path from "path";
 import { ROOT_DIR, WORKSPACES_DIR, getWorkspacePath } from "./workspace.js";
+import { PROJECT_APPLICATION_DIR } from "../config/index.js";
 
 // Skills repository - where installable skills are stored
 // Check for project-level skills directory first, then fallback to workspace/memory
-const PROJECT_SKILLS_DIR = path.resolve(process.cwd(), "workspace", "skills");
-const PROJECT_MEMORY_DIR = path.resolve(process.cwd(), "workspace", "memory");
+const PROJECT_SKILLS_DIR = path.resolve(
+  // PROJECT_APPLICATION_DIR,
+  "workspace",
+  "skills",
+);
+const PROJECT_MEMORY_DIR = path.resolve(
+  // PROJECT_APPLICATION_DIR,
+  "workspace",
+  "memory",
+);
 
 /**
  * Parse YAML frontmatter from SKILL.md content
@@ -63,7 +72,9 @@ async function readSkillMetadata(skillPath) {
       emoji = metadata?.emoji || metadata?.nanobot?.emoji || "";
     } catch {
       // Try to extract emoji from string format like: { "emoji": "🌤️" }
-      const emojiMatch = frontmatter.metadata.match(/emoji["\s:]+["']([^"']+)["']/);
+      const emojiMatch = frontmatter.metadata.match(
+        /emoji["\s:]+["']([^"']+)["']/,
+      );
       if (emojiMatch) {
         emoji = emojiMatch[1];
       }
@@ -172,7 +183,9 @@ export async function installSkill(skillName, workspaceId) {
 
   // Check if already installed
   if (await fs.pathExists(destPath)) {
-    throw new Error(`Skill '${skillName}' is already installed in workspace '${workspaceId}'.`);
+    throw new Error(
+      `Skill '${skillName}' is already installed in workspace '${workspaceId}'.`,
+    );
   }
 
   // Ensure skills directory exists
@@ -193,7 +206,9 @@ export async function removeSkill(skillName, workspaceId) {
 
   // Check if skill exists
   if (!(await fs.pathExists(skillPath))) {
-    throw new Error(`Skill '${skillName}' is not installed in workspace '${workspaceId}'.`);
+    throw new Error(
+      `Skill '${skillName}' is not installed in workspace '${workspaceId}'.`,
+    );
   }
 
   // Remove the skill directory

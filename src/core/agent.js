@@ -1,6 +1,6 @@
 import { openaiCreateChatCompletion } from "../providers/openai.js";
 import { loadAgentContext } from "./workspace.js";
-import { dispatchToolCall } from "./dispatcher.js";
+import { dispatchToolCall, getToolsSchema } from "./dispatcher.js";
 import { appendHistory } from "./memory.js";
 
 const conversationHistory = new Map();
@@ -29,7 +29,6 @@ export async function processMessage(
   const sessionKey = `${channel}:${from}`;
   appendHistory(`[${timestamp}] [${channel}] ${from}: ${text}`);
 
-  // No direct intent extraction, let the model handle tool calls via TOOLS.md prompt
   const systemPrompt = loadAgentContext();
   addToHistory(sessionKey, { role: "user", content: text });
 
@@ -38,29 +37,49 @@ export async function processMessage(
     ...getHistory(sessionKey),
   ];
 
-  const content =
-    (await openaiCreateChatCompletion({ messages })) || "No response.";
+  const tools = getToolsSchema();
+  const response = await openaiCreateChatCompletion({ messages, tools });
+  const content = response?.content || "";
 
   let toolCall = null;
-  try {
-    const cleaned = content
-      .replace(/```json\s*/g, "")
-      .replace(/```\s*/g, "")
-      .trim();
-    const maybeJSON = JSON.parse(cleaned);
-    if (maybeJSON.tool) {
-      toolCall = maybeJSON;
+
+  // 1. Check for native tool calls
+  if (response?.tool_calls && response.tool_calls.length > 0) {
+    const call = response.tool_calls[0].function;
+    try {
+      toolCall = {
+        tool: call.name,
+        args: JSON.parse(call.arguments),
+      };
+    } catch (e) {
+      console.error("Failed to parse native tool arguments", e);
     }
-  } catch (err) {
-    // not JSON — normal text response
+  }
+
+  // 2. Fallback to text-based JSON parsing (as per original logic)
+  if (!toolCall && content) {
+    try {
+      const cleaned = content
+        .replace(/```json\s*/g, "")
+        .replace(/```\s*/g, "")
+        .trim();
+      const maybeJSON = JSON.parse(cleaned);
+      if (maybeJSON.tool) {
+        toolCall = maybeJSON;
+      }
+    } catch (err) {
+      // not JSON — normal text response
+    }
   }
 
   if (toolCall) {
     const toolResult = await dispatchToolCall(toolCall);
+    console.log(`[Tool Call: ${toolCall.tool}]`, toolCall.args);
+
     if (toolResult) {
       addToHistory(sessionKey, {
         role: "assistant",
-        content: `[used tool: ${toolCall.tool}]`,
+        content: content || `[used tool: ${toolCall.tool}]`,
       });
       addToHistory(sessionKey, {
         role: "system",
@@ -72,9 +91,12 @@ export async function processMessage(
         ...getHistory(sessionKey),
       ];
 
-      const finalReply =
-        (await openaiCreateChatCompletion({ messages: followUp })) ||
-        toolResult;
+      const finalResponse = await openaiCreateChatCompletion({
+        messages: followUp,
+        tools,
+      });
+      const finalReply = finalResponse?.content || toolResult;
+
       addToHistory(sessionKey, { role: "assistant", content: finalReply });
       appendHistory(
         `[${timestamp}] [romi] -> ${from}: ${finalReply.substring(0, 200)}`,

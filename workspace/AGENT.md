@@ -1,3 +1,5 @@
+# AGENT.md - Agentic instructions
+
 # Agent Instructions
 
 Be concise, accurate, and friendly.
