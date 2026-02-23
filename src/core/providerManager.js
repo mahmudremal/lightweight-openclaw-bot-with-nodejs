@@ -1,53 +1,54 @@
-import { getActiveConfig } from "../config/index.js";
 import fs from "fs-extra";
 import path from "path";
 import { ROOT_DIR } from "./workspace.js";
+import channels from "../channels/index.js";
 
-const CONFIG_PATH = path.join(ROOT_DIR, "config.json");
+class ProviderManager {
+  constructor() {
+    this.CONFIG_PATH = path.join(ROOT_DIR, "config.json");
+  }
 
-export async function listProviders() {
-  const config = await getActiveConfig();
-  const channels = config.channels || {};
+  async listProviders() {
+    return await channels.availableChannels();
+  }
 
-  // For now, we define what providers are available in the system
-  // This could be dynamic based on files in src/channels
-  const available = ["whatsapp", "telegram", "slack", "discord"];
+  async toggleProvider(name, active) {
+    let config = {};
+    if (await fs.pathExists(this.CONFIG_PATH)) {
+      config = await fs.readJson(this.CONFIG_PATH);
+    }
 
-  return available.map((name) => ({
-    name,
-    active: !!(channels[name] && channels[name].enabled),
-  }));
+    if (!config.channels) config.channels = {};
+    if (!config.channels[name]) {
+      config.channels[name] = { enabled: active };
+    } else {
+      config.channels[name].enabled = active;
+    }
+
+    await fs.writeJson(this.CONFIG_PATH, config, { spaces: 2 });
+    return `Provider '${name}' is now ${active ? "active" : "inactive"}.`;
+  }
+
+  async addProvider(name) {
+    let config = {};
+    if (await fs.pathExists(this.CONFIG_PATH)) {
+      config = await fs.readJson(this.CONFIG_PATH);
+    }
+
+    if (!config.channels) config.channels = {};
+    if (config.channels[name]) {
+      return `Provider '${name}' already exists.`;
+    }
+
+    config.channels[name] = { enabled: true };
+    await fs.writeJson(this.CONFIG_PATH, config, { spaces: 2 });
+    return `Provider '${name}' added and activated.`;
+  }
 }
 
-export async function toggleProvider(name, active) {
-  let config = {};
-  if (await fs.pathExists(CONFIG_PATH)) {
-    config = await fs.readJson(CONFIG_PATH);
-  }
+const providerManager = new ProviderManager();
+export default providerManager;
 
-  if (!config.channels) config.channels = {};
-  if (!config.channels[name]) {
-    config.channels[name] = { enabled: active };
-  } else {
-    config.channels[name].enabled = active;
-  }
-
-  await fs.writeJson(CONFIG_PATH, config, { spaces: 2 });
-  return `Provider '${name}' is now ${active ? "active" : "inactive"}.`;
-}
-
-export async function addProvider(name) {
-  let config = {};
-  if (await fs.pathExists(CONFIG_PATH)) {
-    config = await fs.readJson(CONFIG_PATH);
-  }
-
-  if (!config.channels) config.channels = {};
-  if (config.channels[name]) {
-    return `Provider '${name}' already exists.`;
-  }
-
-  config.channels[name] = { enabled: true };
-  await fs.writeJson(CONFIG_PATH, config, { spaces: 2 });
-  return `Provider '${name}' added and activated.`;
-}
+export const listProviders = () => providerManager.listProviders();
+export const toggleProvider = (n, a) => providerManager.toggleProvider(n, a);
+export const addProvider = (n) => providerManager.addProvider(n);

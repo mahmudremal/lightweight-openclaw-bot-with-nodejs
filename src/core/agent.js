@@ -1,113 +1,168 @@
-import { openaiCreateChatCompletion } from "../providers/openai.js";
-import { loadAgentContext } from "./workspace.js";
-import { dispatchToolCall, getToolsSchema } from "./dispatcher.js";
+import {
+  openaiCreateChatCompletion,
+  getMaxToolIterations,
+} from "../providers/openai.js";
+import workspace from "./workspace.js";
+import {
+  dispatchToolCall,
+  dispatchToolCalls,
+  getToolsSchema,
+} from "./dispatcher.js";
 import { appendHistory } from "./memory.js";
+import logger from "../utils/logger.js";
 
-const conversationHistory = new Map();
-const MAX_HISTORY = 20;
-
-function getHistory(sessionKey) {
-  if (!conversationHistory.has(sessionKey)) {
-    conversationHistory.set(sessionKey, []);
+class Agent {
+  constructor() {
+    this.conversationHistory = new Map();
+    this.MAX_HISTORY = 20;
+    this.DEFAULT_MAX_ITERATIONS = 10;
   }
-  return conversationHistory.get(sessionKey);
-}
 
-function addToHistory(sessionKey, message) {
-  const history = getHistory(sessionKey);
-  history.push(message);
-  if (history.length > MAX_HISTORY) {
-    history.splice(0, history.length - MAX_HISTORY);
+  getHistory(sessionKey) {
+    if (!this.conversationHistory.has(sessionKey)) {
+      this.conversationHistory.set(sessionKey, []);
+    }
+    return this.conversationHistory.get(sessionKey);
   }
-}
 
-export async function processMessage(
-  text,
-  { channel = "cli", from = "user" } = {},
-) {
-  const timestamp = new Date().toISOString();
-  const sessionKey = `${channel}:${from}`;
-  appendHistory(`[${timestamp}] [${channel}] ${from}: ${text}`);
-
-  const systemPrompt = loadAgentContext();
-  addToHistory(sessionKey, { role: "user", content: text });
-
-  const messages = [
-    { role: "system", content: systemPrompt },
-    ...getHistory(sessionKey),
-  ];
-
-  const tools = getToolsSchema();
-  const response = await openaiCreateChatCompletion({ messages, tools });
-  const content = response?.content || "";
-
-  let toolCall = null;
-
-  // 1. Check for native tool calls
-  if (response?.tool_calls && response.tool_calls.length > 0) {
-    const call = response.tool_calls[0].function;
-    try {
-      toolCall = {
-        tool: call.name,
-        args: JSON.parse(call.arguments),
-      };
-    } catch (e) {
-      console.error("Failed to parse native tool arguments", e);
+  addToHistory(sessionKey, message) {
+    const history = this.getHistory(sessionKey);
+    history.push(message);
+    if (history.length > this.MAX_HISTORY) {
+      history.splice(0, history.length - this.MAX_HISTORY);
     }
   }
 
-  // 2. Fallback to text-based JSON parsing (as per original logic)
-  if (!toolCall && content) {
+  parseToolCalls(response) {
+    const toolCalls = [];
+
+    if (response?.tool_calls && response.tool_calls.length > 0) {
+      for (const call of response.tool_calls) {
+        try {
+          toolCalls.push({
+            id: call.id,
+            tool: call.function.name,
+            args: JSON.parse(call.function.arguments),
+          });
+        } catch (e) {
+          logger.error("AGENT", "Failed to parse native tool arguments", e);
+        }
+      }
+      return toolCalls;
+    }
+
+    const content = response?.content || "";
     try {
       const cleaned = content
         .replace(/```json\s*/g, "")
         .replace(/```\s*/g, "")
         .trim();
+
       const maybeJSON = JSON.parse(cleaned);
-      if (maybeJSON.tool) {
-        toolCall = maybeJSON;
+      const calls = Array.isArray(maybeJSON)
+        ? maybeJSON[0]?.tool
+          ? maybeJSON
+          : []
+        : maybeJSON.tool
+          ? [maybeJSON]
+          : [];
+
+      for (const call of calls) {
+        toolCalls.push({
+          id: "call_" + Math.random().toString(36).substring(2, 10),
+          tool: call.tool,
+          args: call.args || call.arguments || {},
+        });
       }
-    } catch (err) {
-      // not JSON — normal text response
-    }
+    } catch (err) {}
+
+    return toolCalls;
   }
 
-  if (toolCall) {
-    const toolResult = await dispatchToolCall(toolCall);
-    console.log(`[Tool Call: ${toolCall.tool}]`, toolCall.args);
+  async processMessage(text, { channel = "cli", from = "user" } = {}) {
+    const timestamp = new Date().toISOString();
+    const sessionKey = `${channel}:${from}`;
+    appendHistory(`[${timestamp}] [${channel}] ${from}: ${text}`);
 
-    if (toolResult) {
-      addToHistory(sessionKey, {
-        role: "assistant",
-        content: content || `[used tool: ${toolCall.tool}]`,
-      });
-      addToHistory(sessionKey, {
-        role: "system",
-        content: `Tool result: ${toolResult}. Respond naturally.`,
-      });
+    const systemPrompt = workspace.loadAgentContext();
+    this.addToHistory(sessionKey, { role: "user", content: text });
 
-      const followUp = [
+    const tools = getToolsSchema();
+    const maxIterations = await getMaxToolIterations().catch(
+      () => this.DEFAULT_MAX_ITERATIONS,
+    );
+    let iterations = 0;
+    let lastContent = "";
+
+    while (iterations < maxIterations) {
+      iterations++;
+
+      const messages = [
         { role: "system", content: systemPrompt },
-        ...getHistory(sessionKey),
+        ...this.getHistory(sessionKey),
       ];
 
-      const finalResponse = await openaiCreateChatCompletion({
-        messages: followUp,
-        tools,
-      });
-      const finalReply = finalResponse?.content || toolResult;
+      logger.debug("AGENT", `Iteration ${iterations}`);
+      const response = await openaiCreateChatCompletion({ messages, tools });
+      if (!response) break;
 
-      addToHistory(sessionKey, { role: "assistant", content: finalReply });
-      appendHistory(
-        `[${timestamp}] [romi] -> ${from}: ${finalReply.substring(0, 200)}`,
+      this.addToHistory(sessionKey, response);
+      if (response.content) {
+        lastContent = response.content;
+      }
+
+      const toolCalls = this.parseToolCalls(response);
+
+      if (toolCalls.length === 0) {
+        break;
+      }
+
+      logger.info(
+        "AGENT",
+        `Romi is using ${toolCalls.length} internal tool(s)...`,
       );
-      return finalReply;
+
+      let results;
+      if (toolCalls.length === 1) {
+        const result = await dispatchToolCall(toolCalls[0]);
+        results = [{ ...toolCalls[0], result }];
+      } else {
+        results = await dispatchToolCalls(toolCalls);
+      }
+
+      for (const r of results) {
+        logger.info(`TOOL_USE: ${r.tool}`, { args: r.args, result: r.result });
+        this.addToHistory(sessionKey, {
+          role: "tool",
+          tool_call_id: r.id,
+          content: String(r.result),
+        });
+      }
     }
+
+    if (iterations >= maxIterations) {
+      logger.warn("AGENT", `Max iterations (${maxIterations}) reached.`);
+      lastContent += "\n\n[Reached maximum reasoning steps.]";
+    }
+
+    appendHistory(
+      `[${timestamp}] [romi] -> ${from}: ${lastContent?.substring(0, 200)}`,
+    );
+
+    return lastContent;
   }
 
-  addToHistory(sessionKey, { role: "assistant", content });
-  appendHistory(
-    `[${timestamp}] [romi] -> ${from}: ${content.substring(0, 200)}`,
-  );
-  return content;
+  clearHistory(sessionKey) {
+    if (sessionKey) {
+      this.conversationHistory.delete(sessionKey);
+    } else {
+      this.conversationHistory.clear();
+    }
+  }
 }
+
+const agent = new Agent();
+export default agent;
+
+export const processMessage = (t, o) => agent.processMessage(t, o);
+export const clearHistory = (s) => agent.clearHistory(s);

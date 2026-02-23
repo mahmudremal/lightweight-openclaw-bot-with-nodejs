@@ -52,10 +52,6 @@
     "openai": {
       "api_key": "sk-your-key-goes-here",
       "api_base": "http://localhost:11434/v1"
-    },
-    "gemini": {
-      "api_key": "",
-      "api_base": ""
     }
   },
   "tools": {

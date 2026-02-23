@@ -25,8 +25,8 @@ const LOG_COLORS = {
 
 class Logger {
   constructor() {
-    this.logTerminal = !false;
-    this.fileWriteLog = !false;
+    this.logTerminal = true;
+    this.fileWriteLog = true;
     const envLevel = process.env.LOG_LEVEL;
     this.logLevel = LOG_LEVELS[envLevel] ? envLevel : "INFO";
     this.logDir = path.join(
@@ -49,11 +49,25 @@ class Logger {
     return path.join(this.logDir, `app-${date.getHours()}.log`);
   }
 
+  formatValue(val) {
+    if (val === undefined) return "undefined";
+    if (val === null) return "null";
+    if (typeof val === "object") {
+      try {
+        return JSON.stringify(val, null, 2);
+      } catch (e) {
+        return "[Circular or Large Object]";
+      }
+    }
+    return val;
+  }
+
   formatMessage(level, context, message, meta = {}) {
     const timestamp = new Date().toISOString();
+    const msgStr = this.formatValue(message);
     const metaStr =
       Object.keys(meta).length > 0 ? ` | ${JSON.stringify(meta)}` : "";
-    return `[${timestamp}] [${level}] [${context}] ${message}${metaStr}`;
+    return `[${timestamp}] [${level}] [${context}] ${msgStr}${metaStr}`;
   }
 
   shouldLog(level) {
@@ -73,11 +87,15 @@ class Logger {
   log(level, context, message, meta = {}) {
     if (!this.shouldLog(level)) return;
 
+    if (message === undefined && typeof context === "string") {
+      message = context;
+      context = "LOG";
+    }
+
     const formattedMessage = this.formatMessage(level, context, message, meta);
     const coloredMessage = `${LOG_COLORS[level]}${formattedMessage}${LOG_COLORS.RESET}`;
 
     this.logTerminal && console.log(coloredMessage);
-
     this.writeToFile(formattedMessage);
   }
 

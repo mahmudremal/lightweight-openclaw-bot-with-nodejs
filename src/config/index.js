@@ -5,105 +5,102 @@ import {
   getWorkspacePath,
   getActiveWorkspaceId,
 } from "../core/workspace.js";
+import eventService from "../utils/events.js";
 
-export const PROJECT_APPLICATION_DIR = "D:\workspace\remal-bot";
+export const PROJECT_APPLICATION_DIR = "D:\\workspace\\remal-bot";
 
-const DEFAULT_GLOBAL_CONFIG = JSON.parse(
-  fs.readFileSync(path.resolve(".romi", "config.json")),
-);
+class Config {
+  constructor() {
+    this._activeConfig = null;
+    this.DEFAULT_GLOBAL_CONFIG = JSON.parse(
+      fs.readFileSync(path.resolve(".romi", "config.json")),
+    );
+  }
 
-function mergeDeep(target, source) {
-  const output = { ...target };
-  if (
-    target &&
-    typeof target === "object" &&
-    source &&
-    typeof source === "object"
-  ) {
-    Object.keys(source).forEach((key) => {
-      if (
-        source[key] &&
-        typeof source[key] === "object" &&
-        !Array.isArray(source[key]) &&
-        target[key] &&
-        typeof target[key] === "object" &&
-        !Array.isArray(target[key])
-      ) {
-        output[key] = mergeDeep(target[key], source[key]);
-      } else {
-        output[key] = source[key];
+  mergeDeep(target, source) {
+    const output = { ...target };
+    if (
+      target &&
+      typeof target === "object" &&
+      source &&
+      typeof source === "object"
+    ) {
+      Object.keys(source).forEach((key) => {
+        if (
+          source[key] &&
+          typeof source[key] === "object" &&
+          !Array.isArray(source[key]) &&
+          target[key] &&
+          typeof target[key] === "object" &&
+          !Array.isArray(target[key])
+        ) {
+          output[key] = this.mergeDeep(target[key], source[key]);
+        } else {
+          output[key] = source[key];
+        }
+      });
+    }
+    return output;
+  }
+
+  async loadGlobalConfig() {
+    const configPath = path.join(ROOT_DIR, "config.json");
+    let globalConfig = {};
+
+    await fs.ensureDir(ROOT_DIR);
+
+    if (await fs.pathExists(configPath)) {
+      try {
+        globalConfig = await fs.readJson(configPath);
+      } catch (error) {
+        globalConfig = {};
       }
-    });
-  }
-  return output;
-}
-
-async function loadGlobalConfig() {
-  const configPath = path.join(ROOT_DIR, "config.json");
-  let globalConfig = {};
-
-  await fs.ensureDir(ROOT_DIR);
-
-  if (await fs.pathExists(configPath)) {
-    try {
-      globalConfig = await fs.readJson(configPath);
-    } catch (error) {
-      console.error(
-        `Error reading global config.json at ${configPath}:`,
-        error,
-      );
-      globalConfig = {};
+    } else {
+      await fs.writeJson(configPath, this.DEFAULT_GLOBAL_CONFIG, { spaces: 2 });
     }
-  } else {
-    await fs.writeJson(configPath, DEFAULT_GLOBAL_CONFIG, { spaces: 2 });
-    console.log(`Created default global config.json at ${configPath}`);
+    return this.mergeDeep(this.DEFAULT_GLOBAL_CONFIG, globalConfig);
   }
-  return mergeDeep(DEFAULT_GLOBAL_CONFIG, globalConfig);
-}
 
-async function loadWorkspaceConfig(workspaceId) {
-  const workspaceConfigPath = path.join(
-    getWorkspacePath(workspaceId),
-    "config.json",
-  );
-  let workspaceConfig = {};
+  async loadWorkspaceConfig(workspaceId) {
+    const workspaceConfigPath = path.join(
+      getWorkspacePath(workspaceId),
+      "config.json",
+    );
+    let workspaceConfig = {};
 
-  await fs.ensureDir(getWorkspacePath(workspaceId));
+    await fs.ensureDir(getWorkspacePath(workspaceId));
 
-  if (await fs.pathExists(workspaceConfigPath)) {
-    try {
-      workspaceConfig = await fs.readJson(workspaceConfigPath);
-    } catch (error) {
-      console.error(
-        `Error reading workspace config.json for '${workspaceId}' at ${workspaceConfigPath}:`,
-        error,
-      );
-      workspaceConfig = {};
+    if (await fs.pathExists(workspaceConfigPath)) {
+      try {
+        workspaceConfig = await fs.readJson(workspaceConfigPath);
+      } catch (error) {
+        workspaceConfig = {};
+      }
     }
-  } else {
-    // await fs.writeJson(workspaceConfigPath, {}, { spaces: 2 });
-    // console.log(
-    //   `Created empty workspace config.json for '${workspaceId}' at ${workspaceConfigPath}`,
-    // );
-  }
-  return workspaceConfig;
-}
-
-let _activeConfig = null;
-
-export async function getActiveConfig() {
-  if (_activeConfig) {
-    return _activeConfig;
+    return workspaceConfig;
   }
 
-  const globalConfig = await loadGlobalConfig();
-  const workspaceId = getActiveWorkspaceId();
-  const workspaceConfig = await loadWorkspaceConfig(workspaceId);
+  async getActiveConfig() {
+    if (this._activeConfig) {
+      return this._activeConfig;
+    }
 
-  _activeConfig = mergeDeep(globalConfig, workspaceConfig);
-  return _activeConfig;
+    const globalConfig = await this.loadGlobalConfig();
+    const workspaceId = getActiveWorkspaceId();
+    const workspaceConfig = await this.loadWorkspaceConfig(workspaceId);
+
+    this._activeConfig = this.mergeDeep(globalConfig, workspaceConfig);
+    return this._activeConfig;
+  }
+
+  invalidateCache() {
+    this._activeConfig = null;
+    eventService.emit("config:invalidated");
+  }
 }
 
-export function invalidateActiveConfigCache() {
-  _activeConfig = null;
-}
+const config = new Config();
+export default config;
+
+export const getActiveConfig = () => config.getActiveConfig();
+export const invalidateActiveConfigCache = () => config.invalidateCache();

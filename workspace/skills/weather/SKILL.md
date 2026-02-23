@@ -15,7 +15,6 @@ Use the `request` tool to fetch weather information.
 To get current weather:
 
 - **Url**: `https://wttr.in/London?format=3`
-- **Method**: `get`
 
 Compact format:
 

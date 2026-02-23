@@ -5,12 +5,13 @@ import Table from "cli-table3";
 dotenv.config();
 
 import { startServer } from "../src/server.js";
-import { startCron } from "../src/scheduler/cron.js";
-import { HeartbeatService } from "../src/scheduler/heartbeat.js";
-import { startWhatsAppClient, sendWhatsApp } from "../src/channels/whatsapp.js";
+import cron from "../src/scheduler/cron.js";
+import heartbeat from "../src/scheduler/heartbeat.js";
+import channels from "../src/channels/index.js";
 import { startChat } from "../src/channels/terminal.js";
 import { initProject } from "../src/init.js";
 import { processMessage } from "../src/core/agent.js";
+import { initializeTools } from "../src/tools/index.js";
 import {
   setActiveWorkspace,
   listWorkspaces,
@@ -41,12 +42,14 @@ program
   .description("Romi — lightweight AI agent")
   .version("0.1.1");
 
-let heartbeat = null;
+// Initialize tools on startup
+initializeTools();
 
 async function cleanup() {
   logger.log("ROMI", "\nShutting down...");
   try {
     if (heartbeat) heartbeat.stop();
+    if (cron) cron.stop();
     await browser.close();
     process.exit(0);
   } catch (err) {
@@ -75,19 +78,9 @@ program
     logger.info("ROMI", `Starting services in default workspace.`);
 
     startServer(Number(opts.port));
-    startCron();
-
-    heartbeat = new HeartbeatService({
-      onHeartbeat: async (prompt) => {
-        return await processMessage(prompt, {
-          channel: "heartbeat",
-          from: "system",
-        });
-      },
-    });
-    heartbeat.start();
-
-    await startWhatsAppClient();
+    await cron.init();
+    await heartbeat.start();
+    await channels.init();
   });
 
 program
@@ -213,7 +206,7 @@ program
   .action(async () => {
     setActiveWorkspace("default");
     logger.info("ROMI", `Starting cron scheduler in default workspace.`);
-    startCron();
+    await cron.init();
   });
 
 program
@@ -238,7 +231,8 @@ program
     );
 
     try {
-      await sendWhatsApp(
+      const whatsapp = channels.getChannel("whatsapp");
+      await whatsapp.sendMessage(
         to,
         Array.isArray(message) ? message.join(" ") : message,
       );

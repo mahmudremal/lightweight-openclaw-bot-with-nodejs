@@ -1,54 +1,94 @@
-import { getActiveConfig } from "../config/index.js";
+import config from "../config/index.js";
 import logger from "../utils/logger.js";
 
-export async function openaiCreateChatCompletion({
-  messages,
-  model,
-  temperature,
-  max_tokens,
-  tools,
-}) {
-  const config = await getActiveConfig();
+class OpenAIProvider {
+  constructor() {}
 
-  const API_KEY = config.providers.openai.api_key;
-  const API_BASE_URL = config.providers.openai.api_base;
-
-  const defaultModel = config.agents.defaults?.model || "gpt-3.5-turbo";
-  const defaultTemperature = config.agents.defaults?.temperature || 0.2;
-  const defaultMaxTokens = config.agents.defaults?.max_tokens || 500;
-
-  const finalModel = model || defaultModel;
-  const finalTemperature = temperature || defaultTemperature;
-  const finalMaxTokens = max_tokens || defaultMaxTokens;
-
-  const body = {
-    temperature: finalTemperature,
-    max_tokens: finalMaxTokens,
-    model: finalModel,
+  async createChatCompletion({
     messages,
-  };
+    model = null,
+    temperature = null,
+    max_tokens = null,
+    tools = null,
+    tool_choice = null,
+  }) {
+    const activeConfig = await config.getActiveConfig();
 
-  if (tools && tools.length > 0) {
-    body.tools = tools;
+    const API_KEY = activeConfig.providers?.openai?.api_key || "dummy";
+    const API_BASE_URL =
+      activeConfig.providers?.openai?.api_base || "http://localhost:11434/v1";
+
+    const defaultModel = activeConfig.agents?.defaults?.model || "qwen3:0.6b";
+    const defaultTemperature =
+      activeConfig.agents?.defaults?.temperature ?? 0.7;
+    const defaultMaxTokens = activeConfig.agents?.defaults?.max_tokens || 2048;
+
+    const finalModel = model || defaultModel;
+    const finalTemperature = temperature ?? defaultTemperature;
+    const finalMaxTokens = max_tokens || defaultMaxTokens;
+
+    const body = {
+      model: finalModel,
+      messages,
+      temperature: finalTemperature,
+      max_tokens: finalMaxTokens,
+    };
+
+    if (tools && tools.length > 0) {
+      body.tool_choice = tool_choice || "auto";
+      body.tools = tools;
+    }
+
+    logger.debug(
+      `LLM Request: model=${finalModel}, tokens=${finalMaxTokens}, temp=${finalTemperature}`,
+    );
+
+    logger.info("LLM_REQUEST", {
+      model: body.model,
+      messages: body.messages.map((m) => ({
+        role: m.role,
+        content: m.content
+          ? m.content.length > 500
+            ? m.content.substring(0, 500) + "..."
+            : m.content
+          : "[empty]",
+        tool_calls: m.tool_calls,
+      })),
+      tools_count: body.tools?.length || 0,
+    });
+
+    const resp = await fetch(`${API_BASE_URL}/chat/completions`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+      timeout: 180000,
+    });
+
+    if (!resp.ok) {
+      const text = await resp.text();
+      throw new Error(`OpenAI API error: ${resp.status} ${text}`);
+    }
+
+    const data = await resp.json();
+    const message = data.choices?.[0]?.message;
+
+    logger.warn("LLM_RESPONSE", data);
+
+    return message;
   }
 
-  const resp = await fetch(`${API_BASE_URL}/chat/completions`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${API_KEY || "dummy"}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body),
-    timeout: 120000,
-  });
-
-  if (!resp.ok) {
-    const text = await resp.text();
-    throw new Error(`OpenAI API error: ${resp.status} ${text}`);
+  async getMaxToolIterations() {
+    const activeConfig = await config.getActiveConfig();
+    return activeConfig.agents?.defaults?.max_tool_iterations || 10;
   }
-
-  const data = await resp.json();
-  const message = data.choices?.[0]?.message;
-  logger.info("LLM", JSON.stringify(data));
-  return message;
 }
+
+const openaiProvider = new OpenAIProvider();
+export default openaiProvider;
+
+export const openaiCreateChatCompletion = (args) =>
+  openaiProvider.createChatCompletion(args);
+export const getMaxToolIterations = () => openaiProvider.getMaxToolIterations();

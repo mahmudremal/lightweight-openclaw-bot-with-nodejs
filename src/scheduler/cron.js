@@ -1,42 +1,146 @@
 import node_cron from "node-cron";
+import fs from "fs-extra";
+import path from "path";
+import crypto from "crypto";
+import { ROOT_DIR } from "../core/workspace.js";
 import logger from "../utils/logger.js";
-import { getActiveConfig } from "../config/index.js";
+import { processMessage } from "../core/agent.js";
+import eventService from "../utils/events.js";
 
-let tasks = [];
-
-export async function startCron() {
-  const config = await getActiveConfig();
-
-  stopCron();
-
-  if (!config.cron || config.cron.length === 0) {
-    logger.info("CRON", "No cron jobs defined in the active workspace config.");
-    return;
+class Cron {
+  constructor() {
+    this.tasks = new Map();
+    // Supporting both 'corn' (user's typo) and 'cron'
+    this.jobsFilePath = path.resolve(ROOT_DIR, "corn", "jobs.json");
+    if (!fs.existsSync(this.jobsFilePath)) {
+      this.jobsFilePath = path.resolve(ROOT_DIR, "cron", "jobs.json");
+    }
   }
 
-  logger.info("CRON", "Scheduling cron jobs...");
+  async init() {
+    await this.start();
+    eventService.on("config:invalidated", () => this.start());
+  }
 
-  for (const job of config.cron) {
-    if (job.schedule && job.name) {
-      const task = node_cron.schedule(job.schedule, () => {
-        logger.info("CRON", `Executing cron job: ${job.name}`);
-        if (job.message) {
-            logger.info("CRON", `Cron job message: ${job.message}`);
+  async start() {
+    this.stop();
+
+    if (!fs.existsSync(this.jobsFilePath)) {
+      await fs.ensureDir(path.dirname(this.jobsFilePath));
+      await fs.writeJson(
+        this.jobsFilePath,
+        { version: 1, jobs: [] },
+        { spaces: 2 },
+      );
+    }
+
+    const data = await fs.readJson(this.jobsFilePath);
+    const jobs = data.jobs || [];
+
+    if (jobs.length === 0) {
+      logger.info("CRON", "No cron jobs found in " + this.jobsFilePath);
+      return;
+    }
+
+    logger.info("CRON", `Scheduling ${jobs.length} jobs...`);
+
+    for (const job of jobs) {
+      if (job.enabled && job.schedule?.expr) {
+        this.scheduleJob(job);
+      }
+    }
+  }
+
+  scheduleJob(job) {
+    const task = node_cron.schedule(
+      job.schedule.expr,
+      async () => {
+        logger.info("CRON", `Executing job: ${job.name} (${job.id})`);
+        try {
+          if (job.payload?.kind === "agentTurn" && job.payload?.message) {
+            await processMessage(job.payload.message, {
+              channel: "cron",
+              from: "system",
+              jobId: job.id,
+            });
+          }
+          this.updateJobState(job.id, {
+            lastStatus: "ok",
+            lastRunAtMs: Date.now(),
+          });
+        } catch (err) {
+          logger.error("CRON", `Job ${job.name} failed: ${err.message}`);
+          this.updateJobState(job.id, {
+            lastStatus: "error",
+            lastError: err.message,
+            lastRunAtMs: Date.now(),
+          });
         }
-      }, {
+      },
+      {
         scheduled: true,
-        timezone: config.timezone || "America/New_York"
-      });
-      tasks.push(task);
-      logger.info("CRON", `Scheduled cron job: '${job.name}' with schedule '${job.schedule}'`);
-    } else {
-      logger.warn("CRON", `Invalid cron job configuration: Missing schedule or name.`, job);
+        timezone: job.schedule.tz || "UTC",
+      },
+    );
+    this.tasks.set(job.id, task);
+    logger.info("CRON", `Scheduled: '${job.name}' [${job.schedule.expr}]`);
+  }
+
+  async updateJobState(jobId, stateUpdates) {
+    try {
+      const data = await fs.readJson(this.jobsFilePath);
+      const jobIndex = data.jobs.findIndex((j) => j.id === jobId);
+      if (jobIndex !== -1) {
+        data.jobs[jobIndex].state = {
+          ...(data.jobs[jobIndex].state || {}),
+          ...stateUpdates,
+        };
+        await fs.writeJson(this.jobsFilePath, data, { spaces: 2 });
+      }
+    } catch (err) {
+      logger.error("CRON", `Failed to update job state: ${err.message}`);
+    }
+  }
+
+  stop() {
+    this.tasks.forEach((task) => task.stop());
+    this.tasks.clear();
+    logger.info("CRON", "All cron jobs stopped.");
+  }
+
+  async getJobs() {
+    const data = await fs.readJson(this.jobsFilePath);
+    return data.jobs || [];
+  }
+
+  async addJob(job) {
+    const data = await fs.readJson(this.jobsFilePath);
+    const newJob = {
+      id: crypto.randomUUID(),
+      createdAtMs: Date.now(),
+      updatedAtMs: Date.now(),
+      enabled: true,
+      ...job,
+    };
+    data.jobs.push(newJob);
+    await fs.writeJson(this.jobsFilePath, data, { spaces: 2 });
+    if (newJob.enabled) this.scheduleJob(newJob);
+    return newJob;
+  }
+
+  async deleteJob(jobId) {
+    const data = await fs.readJson(this.jobsFilePath);
+    data.jobs = data.jobs.filter((j) => j.id !== jobId);
+    await fs.writeJson(this.jobsFilePath, data, { spaces: 2 });
+    if (this.tasks.has(jobId)) {
+      this.tasks.get(jobId).stop();
+      this.tasks.delete(jobId);
     }
   }
 }
 
-export function stopCron() {
-  tasks.forEach(task => task.stop());
-  tasks = [];
-  logger.info("CRON", "All cron jobs stopped.");
-}
+const cron = new Cron();
+export default cron;
+
+export const startCron = () => cron.start();
+export const stopCron = () => cron.stop();
