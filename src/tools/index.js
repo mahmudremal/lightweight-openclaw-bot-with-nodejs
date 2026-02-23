@@ -14,6 +14,7 @@ import {
   read_file,
   write_file,
   append_file,
+  delete_file,
   read_dir,
 } from "./filesystem_tools.js";
 import {
@@ -29,6 +30,7 @@ const coreTools = [
   read_file,
   write_file,
   append_file,
+  delete_file,
   read_dir,
   send_message,
   get_chats_list,

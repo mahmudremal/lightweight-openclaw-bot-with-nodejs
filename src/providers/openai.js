@@ -51,8 +51,9 @@ class OpenAIProvider {
           ? m.content.length > 500
             ? m.content.substring(0, 500) + "..."
             : m.content
-          : "[empty]",
+          : null,
         tool_calls: m.tool_calls,
+        tool_call_id: m.tool_call_id,
       })),
       tools_count: body.tools?.length || 0,
     });

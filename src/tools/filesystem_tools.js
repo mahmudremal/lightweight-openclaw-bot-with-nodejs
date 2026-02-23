@@ -73,6 +73,29 @@ export const append_file = {
   },
 };
 
+export const delete_file = {
+  name: "delete_file",
+  description: "Delete a file from the workspace.",
+  parameters: {
+    type: "object",
+    properties: {
+      path: {
+        type: "string",
+        description: "Path relative to the workspace root",
+      },
+    },
+    required: ["path"],
+  },
+  handler: async ({ path: filePath }, context) => {
+    const workspacePath = context.workspacePath;
+    const fullPath = path.resolve(workspacePath, filePath);
+    if (!fullPath.startsWith(workspacePath)) return "❌ Access denied";
+    if (!fs.existsSync(fullPath)) return `❌ File does not exist: ${filePath}`;
+    await fs.remove(fullPath);
+    return `✅ Deleted file '${filePath}'`;
+  },
+};
+
 export const read_dir = {
   name: "read_dir",
   description: "List files and folders in a directory.",

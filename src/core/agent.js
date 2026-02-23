@@ -94,6 +94,8 @@ class Agent {
     let iterations = 0;
     let lastContent = "";
 
+    const turnToolsResult = [];
+
     while (iterations < maxIterations) {
       iterations++;
 
@@ -132,22 +134,31 @@ class Agent {
 
       for (const r of results) {
         logger.info(`TOOL_USE: ${r.tool}`, { args: r.args, result: r.result });
-        this.addToHistory(sessionKey, {
+        const toolMsg = {
           role: "tool",
           tool_call_id: r.id,
           content: String(r.result),
-        });
+        };
+        this.addToHistory(sessionKey, toolMsg);
+        turnToolsResult.push(toolMsg);
       }
     }
 
     if (iterations >= maxIterations) {
-      logger.warn("AGENT", `Max iterations (${maxIterations}) reached.`);
+      logger.warn("AGENT", `Max iterations reached.`);
       lastContent += "\n\n[Reached maximum reasoning steps.]";
     }
 
     appendHistory(
       `[${timestamp}] [romi] -> ${from}: ${lastContent?.substring(0, 200)}`,
     );
+
+    // Token optimization: Compact tool results after the turn is complete
+    // We keep the last assistant message but can prune the intermediate tool outputs
+    // to keep the history clean for future turns while maintaining context relevance.
+    const history = this.getHistory(sessionKey);
+    // Optional: Prune tool messages if history is getting long.
+    // For now, the existing MAX_HISTORY will handle overflow.
 
     return lastContent;
   }
