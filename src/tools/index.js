@@ -22,7 +22,12 @@ import {
   get_chats_list,
   get_chat_messages,
 } from "./channels_tools.js";
-import { get_cron_jobs, add_cron_job, delete_cron_job } from "./cron_tools.js";
+import {
+  get_cron_jobs,
+  add_cron_job,
+  update_cron_job,
+  delete_cron_job,
+} from "./cron_tools.js";
 
 const coreTools = [
   searchTool,
@@ -37,6 +42,7 @@ const coreTools = [
   get_chat_messages,
   get_cron_jobs,
   add_cron_job,
+  update_cron_job,
   delete_cron_job,
 ];
 

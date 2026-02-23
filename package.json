@@ -4,7 +4,7 @@
   "description": "Romi — lightweight AI personal assistant",
   "type": "module",
   "bin": {
-    "romi": "./bin/romi.js"
+    "romi": "bin/romi.js"
   },
   "scripts": {
     "start": "node ./bin/romi.js start",
@@ -13,7 +13,6 @@
     "init": "node ./bin/romi.js init"
   },
   "dependencies": {
-    "@google/generative-ai": "^0.2.1",
     "axios": "^1.6.0",
     "body-parser": "^1.20.2",
     "cli-table3": "^0.6.5",

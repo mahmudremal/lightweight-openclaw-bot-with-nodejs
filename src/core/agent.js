@@ -84,7 +84,7 @@ class Agent {
     const sessionKey = `${channel}:${from}`;
     appendHistory(`[${timestamp}] [${channel}] ${from}: ${text}`);
 
-    const systemPrompt = workspace.loadAgentContext();
+    const systemPrompt = await workspace.loadAgentContext();
     this.addToHistory(sessionKey, { role: "user", content: text });
 
     const tools = getToolsSchema();
@@ -145,20 +145,13 @@ class Agent {
     }
 
     if (iterations >= maxIterations) {
-      logger.warn("AGENT", `Max iterations reached.`);
+      logger.warn("AGENT", `Max iterationsReached.`);
       lastContent += "\n\n[Reached maximum reasoning steps.]";
     }
 
     appendHistory(
       `[${timestamp}] [romi] -> ${from}: ${lastContent?.substring(0, 200)}`,
     );
-
-    // Token optimization: Compact tool results after the turn is complete
-    // We keep the last assistant message but can prune the intermediate tool outputs
-    // to keep the history clean for future turns while maintaining context relevance.
-    const history = this.getHistory(sessionKey);
-    // Optional: Prune tool messages if history is getting long.
-    // For now, the existing MAX_HISTORY will handle overflow.
 
     return lastContent;
   }

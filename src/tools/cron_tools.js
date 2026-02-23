@@ -48,6 +48,39 @@ export const add_cron_job = {
   },
 };
 
+export const update_cron_job = {
+  name: "update_cron_job",
+  description: "Update an existing scheduled cron job.",
+  parameters: {
+    type: "object",
+    properties: {
+      id: { type: "string", description: "The ID of the job to update" },
+      name: { type: "string", description: "New name of the job" },
+      enabled: { type: "boolean", description: "Enable or disable the job" },
+      schedule: {
+        type: "object",
+        properties: {
+          expr: { type: "string", description: "New cron expression" },
+          tz: { type: "string", description: "New timezone" },
+        },
+      },
+      message: {
+        type: "string",
+        description: "New message to process when job runs",
+      },
+    },
+    required: ["id"],
+  },
+  handler: async ({ id, ...updates }) => {
+    if (updates.message) {
+      updates.payload = { kind: "agentTurn", message: updates.message };
+      delete updates.message;
+    }
+    await cron.updateJob(id, updates);
+    return `Job ${id} updated successfully.`;
+  },
+};
+
 export const delete_cron_job = {
   name: "delete_cron_job",
   description: "Delete a scheduled cron job by ID.",

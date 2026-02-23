@@ -1,19 +1,14 @@
 import fs from "fs-extra";
 import path from "path";
-import {
-  ROOT_DIR,
-  getWorkspacePath,
-  getActiveWorkspaceId,
-} from "../core/workspace.js";
+import { ROOT_DIR, getWorkspacePath, APP_SOURCE_DIR } from "../core/paths.js";
 import eventService from "../utils/events.js";
-
-export const PROJECT_APPLICATION_DIR = "D:\\workspace\\remal-bot";
+import { getActiveWorkspaceId } from "../core/workspace.js";
 
 class Config {
   constructor() {
     this._activeConfig = null;
     this.DEFAULT_GLOBAL_CONFIG = JSON.parse(
-      fs.readFileSync(path.resolve(".romi", "config.json")),
+      fs.readFileSync(path.resolve(APP_SOURCE_DIR, ".romi", "config.json")),
     );
   }
 
@@ -81,9 +76,7 @@ class Config {
   }
 
   async getActiveConfig() {
-    if (this._activeConfig) {
-      return this._activeConfig;
-    }
+    if (this._activeConfig) return this._activeConfig;
 
     const globalConfig = await this.loadGlobalConfig();
     const workspaceId = getActiveWorkspaceId();

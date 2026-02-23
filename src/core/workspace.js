@@ -1,10 +1,13 @@
 import fs from "fs-extra";
 import path from "path";
-import os from "os";
 import config from "../config/index.js";
-
-export const ROOT_DIR = path.resolve(os.homedir(), ".romi");
-export const WORKSPACES_DIR = path.resolve(ROOT_DIR, "workspaces");
+import {
+  ROOT_DIR,
+  WORKSPACES_DIR,
+  getWorkspacePath as getBaseWorkspacePath,
+  APP_SOURCE_DIR,
+} from "./paths.js";
+import skillManager from "./skillManager.js";
 
 class Workspace {
   constructor() {
@@ -23,7 +26,7 @@ class Workspace {
   }
 
   getWorkspacePath(workspaceId = this.activeWorkspaceId) {
-    return path.resolve(WORKSPACES_DIR, workspaceId);
+    return getBaseWorkspacePath(workspaceId);
   }
 
   async listWorkspaces() {
@@ -34,48 +37,24 @@ class Workspace {
       .map((dirent) => dirent.name);
   }
 
-  async ensureDefaultWorkspaceFiles(dir) {
-    const defaults = {};
-    for (const [file, content] of Object.entries(defaults)) {
-      const filePath = path.join(dir, file);
-      if (!(await fs.pathExists(filePath))) {
-        await fs.ensureDir(path.dirname(filePath));
-        await fs.writeFile(filePath, content, "utf8");
-      }
-    }
-  }
-
   async createWorkspace(workspaceId) {
     const targetPath = this.getWorkspacePath(workspaceId);
-    if (await fs.pathExists(targetPath)) {
-      throw new Error(`Workspace '${workspaceId}' already exists.`);
-    }
+    if (await fs.pathExists(targetPath))
+      throw new Error(`Workspace '${workspaceId}' exists.`);
 
-    const projectWorkspaceTemplatePath = path.resolve(
-      process.cwd(),
-      "workspace",
-    );
-
-    await fs.copy(projectWorkspaceTemplatePath, targetPath, {
+    const templatePath = path.resolve(APP_SOURCE_DIR, "workspace");
+    await fs.copy(templatePath, targetPath, {
       overwrite: false,
-      errorOnExist: false,
-      filter: (src, dest) => {
-        const relativePath = path.relative(projectWorkspaceTemplatePath, src);
-        return relativePath !== "skills";
-      },
+      filter: (src) => !path.relative(templatePath, src).startsWith("skills"),
     });
 
     await fs.ensureDir(path.join(targetPath, "memory"));
-    await this.ensureDefaultWorkspaceFiles(targetPath);
     await fs.ensureDir(path.join(targetPath, "skills"));
   }
 
   readWorkspaceFile(filename, workspaceId = this.activeWorkspaceId) {
     const filePath = path.join(this.getWorkspacePath(workspaceId), filename);
-    if (fs.existsSync(filePath)) {
-      return fs.readFileSync(filePath, "utf8");
-    }
-    return "";
+    return fs.existsSync(filePath) ? fs.readFileSync(filePath, "utf8") : "";
   }
 
   writeWorkspaceFile(filename, content, workspaceId = this.activeWorkspaceId) {
@@ -84,21 +63,17 @@ class Workspace {
     fs.writeFileSync(filePath, content, "utf8");
   }
 
-  loadAgentContext(workspaceId = this.activeWorkspaceId) {
+  async loadAgentContext(workspaceId = this.activeWorkspaceId) {
     const workspacePath = this.getWorkspacePath(workspaceId);
     if (!fs.existsSync(workspacePath)) return "";
 
-    const excludedList = [];
-    let files = fs
-      .readdirSync(workspacePath)
-      .filter((i) => i.endsWith(".md"))
-      .filter((i) => !excludedList.includes(i));
+    let files = fs.readdirSync(workspacePath).filter((i) => i.endsWith(".md"));
 
     if (files.includes("BOOTSTRAP.md")) {
       files = files.filter((f) => !["SKILLS.md", "HEARTBEAT.md"].includes(f));
     }
 
-    const toSortList = [
+    const sortOrder = [
       "BOOTSTRAP.md",
       "AGENT.md",
       "IDENTITY.md",
@@ -111,39 +86,39 @@ class Workspace {
     ];
 
     const sortedFiles = files.sort((a, b) => {
-      const indexA = toSortList.indexOf(a);
-      const indexB = toSortList.indexOf(b);
-
-      if (indexA !== -1 && indexB !== -1) return indexA - indexB;
-      if (indexA !== -1) return -1;
-      if (indexB !== -1) return 1;
-
+      const idxA = sortOrder.indexOf(a);
+      const idxB = sortOrder.indexOf(b);
+      if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+      if (idxA !== -1) return -1;
+      if (idxB !== -1) return 1;
       return a.localeCompare(b);
     });
 
     const parts = sortedFiles
-      .map((f) => {
-        const content = fs.readFileSync(path.join(workspacePath, f), "utf8");
-        if (content.trim()) {
-          return content;
-        }
-        return null;
-      })
+      .map((f) => fs.readFileSync(path.join(workspacePath, f), "utf8").trim())
       .filter((c) => c);
+
+    const skills = await skillManager.getWorkspaceSkills(workspaceId);
+    if (skills.length > 0) {
+      const skillLines = skills
+        .map((s) => `- **${s.name}**: ${s.description}`)
+        .join("\n");
+      parts.push(
+        `## Installed Skills\nYou have these skills. For details, read 'skills/[name]/SKILL.md'.\n\n${skillLines}`,
+      );
+    }
 
     const memoryGuidance = `
 ### Memory and File Conventions
-You MUST follow these file naming conventions for saving information:
-- Human user information (preferences, name, etc.) -> USER.md
-- Your "soul" or personality/beliefs -> SOUL.md
-- Your identity, role, and capabilities -> IDENTITY.md
-- General long-term memories or facts -> memory/MEMORY.md
-- Specific contextual tasks or project info -> memory/[task_name].md
+- Human user info -> USER.md
+- Your "soul"/personality -> SOUL.md
+- Your identity -> IDENTITY.md
+- Long-term memories -> memory/MEMORY.md
+- Task contextual info -> memory/[task_name].md
 
 ### Project Structure
-- src/tools/: Your available tools
-- .romi/corn/jobs.json: Storage for scheduled jobs (cron)
-- HEARTBEAT.md: Monitored for background tasks you should perform periodically
+- corn/jobs.json: Scheduled jobs
+- HEARTBEAT.md: Periodic background tasks
 `;
 
     return parts.join("\n\n---\n\n") + "\n\n" + memoryGuidance;
@@ -157,9 +132,10 @@ You MUST follow these file naming conventions for saving information:
 const workspace = new Workspace();
 export default workspace;
 
+export { ROOT_DIR, WORKSPACES_DIR };
+export const getWorkspacePath = (id) => workspace.getWorkspacePath(id);
 export const setActiveWorkspace = (id) => workspace.setActiveWorkspace(id);
 export const getActiveWorkspaceId = () => workspace.getActiveWorkspaceId();
-export const getWorkspacePath = (id) => workspace.getWorkspacePath(id);
 export const listWorkspaces = () => workspace.listWorkspaces();
 export const createWorkspace = (id) => workspace.createWorkspace(id);
 export const readWorkspaceFile = (f, id) => workspace.readWorkspaceFile(f, id);

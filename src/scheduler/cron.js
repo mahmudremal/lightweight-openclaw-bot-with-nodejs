@@ -10,7 +10,6 @@ import eventService from "../utils/events.js";
 class Cron {
   constructor() {
     this.tasks = new Map();
-    // Supporting both 'corn' (user's typo) and 'cron'
     this.jobsFilePath = path.resolve(ROOT_DIR, "corn", "jobs.json");
     if (!fs.existsSync(this.jobsFilePath)) {
       this.jobsFilePath = path.resolve(ROOT_DIR, "cron", "jobs.json");
@@ -126,6 +125,31 @@ class Cron {
     await fs.writeJson(this.jobsFilePath, data, { spaces: 2 });
     if (newJob.enabled) this.scheduleJob(newJob);
     return newJob;
+  }
+
+  async updateJob(jobId, updates) {
+    const data = await fs.readJson(this.jobsFilePath);
+    const jobIndex = data.jobs.findIndex((j) => j.id === jobId);
+    if (jobIndex === -1) throw new Error("Job not found");
+
+    data.jobs[jobIndex] = {
+      ...data.jobs[jobIndex],
+      ...updates,
+      updatedAtMs: Date.now(),
+    };
+
+    await fs.writeJson(this.jobsFilePath, data, { spaces: 2 });
+
+    if (this.tasks.has(jobId)) {
+      this.tasks.get(jobId).stop();
+      this.tasks.delete(jobId);
+    }
+
+    if (data.jobs[jobIndex].enabled) {
+      this.scheduleJob(data.jobs[jobIndex]);
+    }
+
+    return data.jobs[jobIndex];
   }
 
   async deleteJob(jobId) {
