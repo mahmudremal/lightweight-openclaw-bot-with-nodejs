@@ -1,7 +1,7 @@
 import fs from "fs-extra";
 import path from "path";
 import { ROOT_DIR, getWorkspacePath, APP_SOURCE_DIR } from "../core/paths.js";
-import eventService from "../utils/events.js";
+import events from "../utils/events.js";
 import { getActiveWorkspaceId } from "../core/workspace.js";
 
 class Config {
@@ -85,10 +85,19 @@ class Config {
     this._activeConfig = this.mergeDeep(globalConfig, workspaceConfig);
     return this._activeConfig;
   }
+  async getActiveAgentConfig() {
+    const workspaceId = getActiveWorkspaceId();
+    const config = await this.getActiveConfig();
+    return (
+      Object.values(config?.agents || {}).find(
+        ({ workspace }) => workspace == workspaceId,
+      ) || {}
+    );
+  }
 
   invalidateCache() {
     this._activeConfig = null;
-    eventService.emit("config:invalidated");
+    events.emit("config:invalidated");
   }
 }
 

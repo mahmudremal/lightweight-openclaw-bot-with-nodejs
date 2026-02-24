@@ -1,6 +1,7 @@
 import fs from "fs-extra";
 import path from "path";
 import config from "../config/index.js";
+import logger from "../utils/logger.js";
 import {
   ROOT_DIR,
   WORKSPACES_DIR,
@@ -124,6 +125,74 @@ class Workspace {
     return parts.join("\n\n---\n\n") + "\n\n" + memoryGuidance;
   }
 
+  async resolveWorkspace(workspaceName, askQuestion = null) {
+    if (!workspaceName) {
+      const workspaces = await this.listWorkspaces();
+      if (workspaces.length === 0) {
+        logger.info(
+          "ROMI",
+          "No workspaces found. Creating a 'default' workspace.",
+        );
+        await this.createWorkspace("default");
+        workspaceName = "default";
+      } else if (workspaces.length === 1) {
+        workspaceName = workspaces[0];
+        logger.info(
+          "ROMI",
+          `Automatically selected workspace: '${workspaceName}'`,
+        );
+      } else if (askQuestion) {
+        logger.info("ROMI", "Available workspaces:");
+        workspaces.forEach((ws, index) =>
+          logger.info("ROMI", `  ${index + 1}. ${ws}`),
+        );
+        const answer = await askQuestion(
+          "Enter the number of the workspace you want to use, or type a new name to create one: ",
+        );
+        const selectedIndex = parseInt(answer, 10) - 1;
+
+        if (
+          !isNaN(selectedIndex) &&
+          selectedIndex >= 0 &&
+          selectedIndex < workspaces.length
+        ) {
+          workspaceName = workspaces[selectedIndex];
+        } else {
+          workspaceName = answer.trim();
+          try {
+            await this.createWorkspace(workspaceName);
+            logger.info("ROMI", `Created new workspace: '${workspaceName}'`);
+          } catch (error) {
+            if (error.message.includes("already exists")) {
+              logger.info(
+                "ROMI",
+                `Workspace '${workspaceName}' already exists. Using it.`,
+              );
+            } else {
+              throw error;
+            }
+          }
+        }
+      } else {
+        workspaceName = workspaces.includes("default")
+          ? "default"
+          : workspaces[0];
+        logger.info(
+          "ROMI",
+          `Using workspace: '${workspaceName}' (non-interactive fallback)`,
+        );
+      }
+    }
+
+    const allWorkspaces = await this.listWorkspaces();
+    if (!allWorkspaces.includes(workspaceName)) {
+      throw new Error(`Workspace '${workspaceName}' not found.`);
+    }
+
+    this.setActiveWorkspace(workspaceName);
+    return workspaceName;
+  }
+
   isInitialized() {
     return fs.existsSync(ROOT_DIR);
   }
@@ -143,3 +212,4 @@ export const writeWorkspaceFile = (f, c, id) =>
   workspace.writeWorkspaceFile(f, c, id);
 export const loadAgentContext = (id) => workspace.loadAgentContext(id);
 export const isInitialized = () => workspace.isInitialized();
+export const resolveWorkspace = (n, q) => workspace.resolveWorkspace(n, q);

@@ -23,5 +23,5 @@ class Events extends EventEmitter {
   }
 }
 
-const eventService = new Events();
-export default eventService;
+const events = new Events();
+export default events;

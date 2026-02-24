@@ -5,7 +5,7 @@ import crypto from "crypto";
 import { ROOT_DIR } from "../core/workspace.js";
 import logger from "../utils/logger.js";
 import { processMessage } from "../core/agent.js";
-import eventService from "../utils/events.js";
+import events from "../utils/events.js";
 
 class Cron {
   constructor() {
@@ -18,7 +18,7 @@ class Cron {
 
   async init() {
     await this.start();
-    eventService.on("config:invalidated", () => this.start());
+    events.on("config:invalidated", () => this.start());
   }
 
   async start() {

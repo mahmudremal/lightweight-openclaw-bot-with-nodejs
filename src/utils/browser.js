@@ -1,5 +1,5 @@
 import puppeteer from "puppeteer";
-import { getActiveConfig } from "../config/index.js"; // Import getActiveConfig
+import config, { getActiveConfig } from "../config/index.js"; // Import getActiveConfig
 import logger from "./logger.js";
 import path from "path";
 import fs from "fs";
@@ -17,16 +17,14 @@ class Browser {
       fs.mkdirSync(userDataDir, { recursive: true });
     }
 
-    const config = await getActiveConfig(); // Get the active config
-
-    const puppeteerConfig =
-      config.agents?.[getActiveWorkspaceId()]?.puppeteer || {};
+    const agentConfig = await config.getActiveAgentConfig();
+    const puppeteerConfig = agentConfig?.puppeteer || {};
 
     this.currentInstance = await puppeteer.launch({
       executablePath: puppeteerConfig.browserPath || null, // Use config value
       userDataDir: userDataDir,
       defaultViewport: null,
-      headless: puppeteerConfig?.headless ?? false, // Use config value //
+      headless: puppeteerConfig?.headless ?? "new", // Use config value //
       args: puppeteerConfig.args || [],
     });
 

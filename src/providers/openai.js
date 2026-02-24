@@ -82,8 +82,8 @@ class OpenAIProvider {
   }
 
   async getMaxToolIterations() {
-    const activeConfig = await config.getActiveConfig();
-    return activeConfig.agents?.defaults?.max_tool_iterations || 10;
+    const agentConfig = await config.getActiveAgentConfig();
+    return agentConfig?.max_tool_iterations || 10;
   }
 }
 

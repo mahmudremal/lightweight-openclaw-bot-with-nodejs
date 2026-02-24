@@ -18,6 +18,7 @@ import {
   createWorkspace,
   getActiveWorkspaceId,
   isInitialized,
+  resolveWorkspace,
 } from "../src/core/workspace.js";
 import {
   getWorkspaceSkills,
@@ -73,9 +74,13 @@ program
   .command("start")
   .description("Start server + scheduler + heartbeat + whatsapp")
   .option("-p, --port <n>", "server port", PORT)
+  .option("-w, --workspace <name>", "Specify the workspace to use")
   .action(async (opts) => {
-    setActiveWorkspace("default");
-    logger.info("ROMI", `Starting services in default workspace.`);
+    await resolveWorkspace(opts.workspace);
+    logger.info(
+      "ROMI",
+      `Starting services in workspace: '${getActiveWorkspaceId()}'`,
+    );
 
     startServer(Number(opts.port));
     await cron.init();
@@ -88,72 +93,7 @@ program
   .description("Interactive terminal chat with Romi")
   .option("-w, --workspace <name>", "Specify the workspace to chat in")
   .action(async (opts) => {
-    let workspaceName = opts.workspace;
-
-    if (!workspaceName) {
-      const workspaces = await listWorkspaces();
-      if (workspaces.length === 0) {
-        logger.info(
-          "ROMI",
-          "No workspaces found. Creating a 'default' workspace.",
-        );
-        await createWorkspace("default");
-        workspaceName = "default";
-      } else if (workspaces.length === 1) {
-        workspaceName = workspaces[0];
-        logger.info(
-          "ROMI",
-          `Automatically selected workspace: '${workspaceName}'`,
-        );
-      } else {
-        logger.info("ROMI", "Available workspaces:");
-        workspaces.forEach((ws, index) =>
-          logger.info("ROMI", `  ${index + 1}. ${ws}`),
-        );
-        const answer = await askQuestion(
-          "Enter the number of the workspace you want to use, or type a new name to create one: ",
-        );
-        const selectedIndex = parseInt(answer, 10) - 1;
-
-        if (
-          !isNaN(selectedIndex) &&
-          selectedIndex >= 0 &&
-          selectedIndex < workspaces.length
-        ) {
-          workspaceName = workspaces[selectedIndex];
-        } else {
-          workspaceName = answer.trim();
-          try {
-            await createWorkspace(workspaceName);
-            logger.info("ROMI", `Created new workspace: '${workspaceName}'`);
-          } catch (error) {
-            if (error.message.includes("already exists")) {
-              logger.info(
-                "ROMI",
-                `Workspace '${workspaceName}' already exists. Using it.`,
-              );
-            } else {
-              logger.error(
-                "ROMI",
-                `Error creating workspace '${workspaceName}': ${error.message}`,
-              );
-              process.exit(1);
-            }
-          }
-        }
-      }
-    }
-
-    const allWorkspaces = await listWorkspaces();
-    if (!allWorkspaces.includes(workspaceName)) {
-      logger.error(
-        "ROMI",
-        `Workspace '${workspaceName}' not found. Please create it first or choose an existing one.`,
-      );
-      process.exit(1);
-    }
-
-    setActiveWorkspace(workspaceName);
+    const workspaceName = await resolveWorkspace(opts.workspace, askQuestion);
     logger.info("ROMI", `Chatting in workspace: '${workspaceName}'`);
     startChat(rl);
   });
@@ -163,17 +103,7 @@ program
   .description("Send a single message and get a reply")
   .option("-w, --workspace <name>", "Specify the workspace to use")
   .action(async (message, opts) => {
-    let workspaceName = opts.workspace || "default";
-
-    const allWorkspaces = await listWorkspaces();
-    if (!allWorkspaces.includes(workspaceName)) {
-      logger.error(
-        "ROMI",
-        `Workspace '${workspaceName}' not found. Please create it first or choose an existing one.`,
-      );
-      process.exit(1);
-    }
-    setActiveWorkspace(workspaceName);
+    const workspaceName = await resolveWorkspace(opts.workspace);
     logger.info("ROMI", `Using workspace: '${workspaceName}' for ask command.`);
 
     const text = Array.isArray(message) ? message.join(" ") : message;
@@ -194,18 +124,23 @@ program
   .command("server")
   .description("Start webhook server only")
   .option("-p, --port <n>", "server port", PORT)
+  .option("-w, --workspace <name>", "Specify the workspace to use")
   .action(async (opts) => {
-    setActiveWorkspace("default");
-    logger.info("ROMI", `Starting server in default workspace.`);
+    const workspaceName = await resolveWorkspace(opts.workspace);
+    logger.info("ROMI", `Starting server in workspace: '${workspaceName}'`);
     startServer(Number(opts.port));
   });
 
 program
   .command("cron")
   .description("Start scheduler")
-  .action(async () => {
-    setActiveWorkspace("default");
-    logger.info("ROMI", `Starting cron scheduler in default workspace.`);
+  .option("-w, --workspace <name>", "Specify the workspace to use")
+  .action(async (opts) => {
+    const workspaceName = await resolveWorkspace(opts.workspace);
+    logger.info(
+      "ROMI",
+      `Starting cron scheduler in workspace: '${workspaceName}'`,
+    );
     await cron.init();
   });
 
@@ -214,17 +149,7 @@ program
   .description("Send a WhatsApp message")
   .option("-w, --workspace <name>", "Specify the workspace to use")
   .action(async (to, message, opts) => {
-    let workspaceName = opts.workspace || "default";
-
-    const allWorkspaces = await listWorkspaces();
-    if (!allWorkspaces.includes(workspaceName)) {
-      logger.error(
-        "ROMI",
-        `Workspace '${workspaceName}' not found. Please create it first or choose an existing one.`,
-      );
-      process.exit(1);
-    }
-    setActiveWorkspace(workspaceName);
+    const workspaceName = await resolveWorkspace(opts.workspace);
     logger.info(
       "ROMI",
       `Using workspace: '${workspaceName}' for send command.`,
@@ -264,8 +189,9 @@ skills
 skills
   .command("installed")
   .description("List installed skills")
-  .action(async () => {
-    const activeWorkspaceId = getActiveWorkspaceId();
+  .option("-w, --workspace <name>", "Specify the workspace to use")
+  .action(async (opts) => {
+    const activeWorkspaceId = await resolveWorkspace(opts.workspace);
     const installed = await getWorkspaceSkills(activeWorkspaceId);
     if (installed.length === 0) {
       logger.info(
@@ -285,8 +211,9 @@ skills
 skills
   .command("available")
   .description("List available skills not yet installed")
-  .action(async () => {
-    const activeWorkspaceId = getActiveWorkspaceId();
+  .option("-w, --workspace <name>", "Specify the workspace to use")
+  .action(async (opts) => {
+    const activeWorkspaceId = await resolveWorkspace(opts.workspace);
     const installed = await getWorkspaceSkills(activeWorkspaceId);
     const all = await getInstallableSkills();
     const installedNames = installed.map((s) => s.name);
@@ -302,8 +229,9 @@ skills
 skills
   .command("install <skillName>")
   .description("Install a skill")
-  .action(async (skillName) => {
-    const activeWorkspaceId = getActiveWorkspaceId();
+  .option("-w, --workspace <name>", "Specify the workspace to use")
+  .action(async (skillName, opts) => {
+    const activeWorkspaceId = await resolveWorkspace(opts.workspace);
     try {
       const result = await installSkill(skillName, activeWorkspaceId);
       console.log(result);
@@ -317,8 +245,9 @@ skills
 skills
   .command("remove <skillName>")
   .description("Remove a skill")
-  .action(async (skillName) => {
-    const activeWorkspaceId = getActiveWorkspaceId();
+  .option("-w, --workspace <name>", "Specify the workspace to use")
+  .action(async (skillName, opts) => {
+    const activeWorkspaceId = await resolveWorkspace(opts.workspace);
     try {
       const result = await removeSkill(skillName, activeWorkspaceId);
       logger.log("ROMI", result);
