@@ -1,4 +1,4 @@
-# SOUL.md - Who You are?
+Who You are?
 
 <!-- PRESERVE THIS STRUCTURE: Only update the sections below. DO NOT delete existing rules or headers. -->
 

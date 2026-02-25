@@ -71,7 +71,7 @@ class Workspace {
     let files = fs.readdirSync(workspacePath).filter((i) => i.endsWith(".md"));
 
     if (files.includes("BOOTSTRAP.md")) {
-      files = files.filter((f) => !["SKILLS.md", "HEARTBEAT.md"].includes(f));
+      files = files.filter((f) => !["HEARTBEAT.md"].includes(f));
     }
 
     const sortOrder = [
@@ -95,19 +95,21 @@ class Workspace {
       return a.localeCompare(b);
     });
 
-    const parts = sortedFiles
-      .map((f) => fs.readFileSync(path.join(workspacePath, f), "utf8").trim())
-      .filter((c) => c);
-
     const skills = await skillManager.getWorkspaceSkills(workspaceId);
-    if (skills.length > 0) {
-      const skillLines = skills
-        .map((s) => `- **${s.name}**: ${s.description}`)
-        .join("\n");
-      parts.push(
-        `## Installed Skills\nYou have these skills. For details, read 'skills/[name]/SKILL.md'.\n\n${skillLines}`,
-      );
-    }
+
+    const parts = sortedFiles
+      .map((f) => {
+        let content = `# ${f}\n\n${fs.readFileSync(path.join(workspacePath, f), "utf8").trim()}`;
+        if (f == "SKILLS.md") {
+          content +=
+            "\n\n" +
+            skills
+              .map(({ name, description }) => ` - **${name}**: ${description}`)
+              .join("\n");
+        }
+        return content;
+      })
+      .filter((c) => c);
 
     const memoryGuidance = `
 ### Memory and File Conventions
@@ -122,7 +124,8 @@ class Workspace {
 - HEARTBEAT.md: Periodic background tasks
 `;
 
-    return parts.join("\n\n---\n\n") + "\n\n" + memoryGuidance;
+    const result = parts.join("\n\n---\n\n") + "\n\n" + memoryGuidance;
+    return result;
   }
 
   async resolveWorkspace(workspaceName, askQuestion = null) {

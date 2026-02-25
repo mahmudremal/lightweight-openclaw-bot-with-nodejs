@@ -1,9 +1,12 @@
-import pkg from "whatsapp-web.js";
-const { Client, LocalAuth } = pkg;
+import {
+  makeWASocket,
+  useMultiFileAuthState,
+  DisconnectReason,
+  fetchLatestBaileysVersion,
+} from "@whiskeysockets/baileys";
 import qrcode from "qrcode-terminal";
 import path from "path";
 import fs from "fs-extra";
-import browser from "../utils/browser.js";
 import { processMessage } from "../core/agent.js";
 import logger from "../utils/logger.js";
 import { ROOT_DIR } from "../core/workspace.js";
@@ -11,11 +14,12 @@ import config from "../config/index.js";
 
 class WhatsApp {
   constructor() {
-    this.client = null;
+    this.sock = null;
+    this.authState = null;
   }
 
   async init() {
-    if (this.client) return this.client;
+    if (this.sock) return this.sock;
 
     const storagePath = path.resolve(ROOT_DIR, "storage", "whatsapp-session");
     await fs.ensureDir(storagePath);
@@ -28,98 +32,108 @@ class WhatsApp {
       return;
     }
 
-    const browserInstance = await browser.getBrowser();
-    const browserWSEndpoint = browserInstance.wsEndpoint();
+    const { state, saveCreds } = await useMultiFileAuthState(storagePath);
+    const { version } = await fetchLatestBaileysVersion();
 
-    this.client = new Client({
-      authStrategy: new LocalAuth({ clientId: "romi", dataPath: storagePath }),
-      authTimeoutMs: 120000,
-      puppeteer: {
-        browserWSEndpoint,
-        ...(waConfig.puppeteer || {}),
-      },
+    this.sock = makeWASocket({
+      version,
+      auth: state,
+      printQRInTerminal: false, // We'll handle it manually for better logging
+      logger: undefined, // Replace with internal logger if needed
     });
 
-    this.client.on("qr", (qr) => {
-      logger.info("WHATSAPP", "Scan QR code to connect:");
-      qrcode.generate(qr, { small: true });
-    });
+    this.sock.ev.on("creds.update", saveCreds);
 
-    this.client.on("ready", () =>
-      logger.log("WHATSAPP", "WhatsApp client ready"),
-    );
+    this.sock.ev.on("connection.update", (update) => {
+      const { connection, lastDisconnect, qr } = update;
 
-    this.client.on("auth_failure", (msg) =>
-      logger.error("WHATSAPP", "WhatsApp auth failure:", msg),
-    );
+      if (qr) {
+        logger.info("WHATSAPP", "Scan QR code to connect:");
+        qrcode.generate(qr, { small: true });
+      }
 
-    this.client.on("disconnected", (reason) =>
-      logger.warn("WHATSAPP", `WhatsApp client disconnected: ${reason}`),
-    );
-
-    this.client.on("message", async (msg) => {
-      try {
-        const from = `whatsapp:${msg.from}`;
-        const body = msg.body || "";
-        logger.log("WHATSAPP", `[WA] ${from} -> ${body}`);
-
-        // Skip messages from self to avoid loops unless explicitly allowed
-        if (msg.fromMe) return;
-
-        const reply = await processMessage(body, {
-          channel: "whatsapp",
-          from,
-          message: msg,
-        });
-        if (reply) await this.sendMessage(msg.from, reply);
-      } catch (err) {
-        logger.error("WHATSAPP", "Error handling incoming WA message:", err);
+      if (connection === "close") {
+        const shouldReconnect =
+          lastDisconnect.error?.output?.statusCode !==
+          DisconnectReason.loggedOut;
+        logger.warn(
+          "WHATSAPP",
+          `Connection closed due to ${lastDisconnect.error}, reconnecting ${shouldReconnect}`,
+        );
+        if (shouldReconnect) {
+          this.sock = null;
+          this.init();
+        }
+      } else if (connection === "open") {
+        logger.log("WHATSAPP", "WhatsApp connection opened successfully");
       }
     });
 
-    await this.client
-      .initialize()
-      .catch((err) =>
-        logger.error("WHATSAPP", "Failed to initialize WhatsApp client:", err),
-      );
+    this.sock.ev.on("messages.upsert", async (m) => {
+      if (m.type !== "notify") return;
 
-    return this.client;
+      for (const msg of m.messages) {
+        if (!msg.message || msg.key.fromMe) continue;
+
+        const from = msg.key.remoteJid;
+        const text =
+          msg.message.conversation ||
+          msg.message.extendedTextMessage?.text ||
+          "";
+
+        if (!text) continue;
+
+        logger.log("WHATSAPP", `[WA] ${from} -> ${text}`);
+
+        try {
+          const reply = await processMessage(text, {
+            channel: "whatsapp",
+            from: `whatsapp:${from}`,
+            message: msg,
+          });
+
+          if (reply) {
+            await this.sendMessage(from, reply);
+          }
+        } catch (err) {
+          logger.error("WHATSAPP", "Error handling incoming WA message:", err);
+        }
+      }
+    });
+
+    return this.sock;
   }
 
   async sendMessage(to, message) {
-    if (!this.client) {
+    if (!this.sock) {
       await this.init();
     }
 
-    let chatId = to;
+    let jid = to;
     if (typeof to === "string") {
       if (to.startsWith("whatsapp:")) {
-        const n = to.split(":")[1];
-        chatId = n.includes("@") ? n : `${n.replace("+", "")}@c.us`;
-      } else if (/^\+?\d+$/.test(to)) {
-        chatId = `${to.replace("+", "")}@c.us`;
-      } else if (!to.includes("@")) {
-        chatId = `${to}@c.us`;
+        jid = to.split(":")[1];
+      }
+      if (!jid.includes("@")) {
+        jid = `${jid.replace("+", "")}@s.whatsapp.net`;
       }
     }
 
     try {
-      return await this.client.sendMessage(chatId, message);
+      return await this.sock.sendMessage(jid, { text: message });
     } catch (err) {
       logger.error("WHATSAPP", "sendMessage error:", err.message);
       throw err;
     }
   }
 
+  // Helper for backward compatibility or future use
   async getChats() {
-    if (!this.client) return [];
-    return await this.client.getChats();
+    return []; // Baileys doesn't store chats by default without a Store
   }
 
   async getMessages(chatId, limit = 20) {
-    if (!this.client) return [];
-    const chat = await this.client.getChatById(chatId);
-    return await chat.fetchMessages({ limit });
+    return []; // Baileys doesn't store messages by default without a Store
   }
 }
 

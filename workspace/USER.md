@@ -1,4 +1,4 @@
-# USER.md - Your Human
+Your Human
 
 <!-- PRESERVE THIS STRUCTURE: Only update the sections below. DO NOT delete existing content or headers. -->
 

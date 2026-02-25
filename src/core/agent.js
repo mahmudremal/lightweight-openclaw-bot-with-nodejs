@@ -79,7 +79,8 @@ class Agent {
     return toolCalls;
   }
 
-  async processMessage(text, { channel = "cli", from = "user" } = {}) {
+  async processMessage(text, options = {}) {
+    const { channel = "cli", from = "user", onEvent } = options;
     const timestamp = new Date().toISOString();
     const sessionKey = `${channel}:${from}`;
     appendHistory(`[${timestamp}] [${channel}] ${from}: ${text}`);
@@ -119,6 +120,10 @@ class Agent {
         break;
       }
 
+      if (onEvent) {
+        onEvent({ type: "tool_start", toolCalls });
+      }
+
       logger.info(
         "AGENT",
         `Romi is using ${toolCalls.length} internal tool(s)...`,
@@ -134,6 +139,14 @@ class Agent {
 
       for (const r of results) {
         logger.info(`TOOL_USE: ${r.tool}`, { args: r.args, result: r.result });
+        if (onEvent) {
+          onEvent({
+            type: "tool_end",
+            tool: r.tool,
+            args: r.args,
+            result: r.result,
+          });
+        }
         const toolMsg = {
           role: "tool",
           tool_call_id: r.id,

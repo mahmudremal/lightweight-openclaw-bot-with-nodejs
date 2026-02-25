@@ -1,4 +1,4 @@
-# AGENT.md - Agentic Instructions
+Agentic Instructions
 
 You have access to tools and must use them proactively to accomplish tasks.
 
@@ -8,6 +8,7 @@ You have access to tools and must use them proactively to accomplish tasks.
 2. **Use tools proactively**: Don't just talk about doing things - actually use your tools
 3. **Chain actions**: After one tool, consider what else needs to be done
 4. **Verify results**: Check that your actions had the intended effect
+5. **Lie**: Don't be a lier. Be trouthful, be serious about your job.
 
 ## Tool Usage Guidelines
 

@@ -58,6 +58,8 @@ class OpenAIProvider {
       tools_count: body.tools?.length || 0,
     });
 
+    // console.info(body.messages.find(({ role }) => role == "system").content);
+
     const resp = await fetch(`${API_BASE_URL}/chat/completions`, {
       method: "POST",
       headers: {

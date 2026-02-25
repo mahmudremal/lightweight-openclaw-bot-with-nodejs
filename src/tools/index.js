@@ -8,7 +8,7 @@ import {
   executeToolsParallel,
 } from "./registry.js";
 
-import searchTool from "./search.js";
+// import searchTool from "./search.js";
 import requestTool from "./request.js";
 import {
   read_file,
@@ -28,9 +28,10 @@ import {
   update_cron_job,
   delete_cron_job,
 } from "./cron_tools.js";
+import { terminal_exec } from "./terminal_tools.js";
 
 const coreTools = [
-  searchTool,
+  // searchTool,
   requestTool,
   read_file,
   write_file,
@@ -44,6 +45,7 @@ const coreTools = [
   add_cron_job,
   update_cron_job,
   delete_cron_job,
+  terminal_exec,
 ];
 
 export function initializeTools() {

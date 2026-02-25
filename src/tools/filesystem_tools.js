@@ -1,5 +1,6 @@
 import fs from "fs-extra";
 import path from "path";
+import { rootify } from "../core/paths.js";
 
 export const read_file = {
   name: "read_file",
@@ -14,10 +15,12 @@ export const read_file = {
     },
     required: ["path"],
   },
-  handler: async ({ path: filePath }, context) => {
+  handler: async ({ path: fPath }, context) => {
+    const filePath = rootify(fPath);
     const workspacePath = context.workspacePath;
     const fullPath = path.resolve(workspacePath, filePath);
-    if (!fullPath.startsWith(workspacePath)) return "❌ Access denied";
+    if (!fullPath.startsWith(workspacePath))
+      return "❌ Access denied" + " " + fullPath;
     if (!fs.existsSync(fullPath)) return `❌ File does not exist: ${filePath}`;
     const content = await fs.readFile(fullPath, "utf8");
     return `📄 Content of '${filePath}':\n${content}`;
@@ -39,8 +42,16 @@ export const write_file = {
     },
     required: ["path", "content"],
   },
-  handler: async ({ path: filePath, content }, context) => {
+  handler: async ({ path: fPath, content }, context) => {
+    const filePath = rootify(fPath);
     const workspacePath = context.workspacePath;
+    const dirPaths = filePath
+      .split("/")
+      .filter((t) => t)
+      .slice(0, -1);
+    if (dirPaths?.length) {
+      fs.mkdirSync(dirPaths.join("/"));
+    }
     const fullPath = path.resolve(workspacePath, filePath);
     if (!fullPath.startsWith(workspacePath)) return "❌ Access denied";
     await fs.ensureDir(path.dirname(fullPath));
@@ -63,7 +74,8 @@ export const append_file = {
     },
     required: ["path", "content"],
   },
-  handler: async ({ path: filePath, content }, context) => {
+  handler: async ({ path: fPath, content }, context) => {
+    const filePath = rootify(fPath);
     const workspacePath = context.workspacePath;
     const fullPath = path.resolve(workspacePath, filePath);
     if (!fullPath.startsWith(workspacePath)) return "❌ Access denied";
@@ -86,7 +98,8 @@ export const delete_file = {
     },
     required: ["path"],
   },
-  handler: async ({ path: filePath }, context) => {
+  handler: async ({ path: fPath }, context) => {
+    const filePath = rootify(fPath);
     const workspacePath = context.workspacePath;
     const fullPath = path.resolve(workspacePath, filePath);
     if (!fullPath.startsWith(workspacePath)) return "❌ Access denied";
@@ -108,7 +121,8 @@ export const read_dir = {
       },
     },
   },
-  handler: async ({ path: dirPath = "." }, context) => {
+  handler: async ({ path: fPath = "." }, context) => {
+    const dirPath = rootify(fPath);
     const workspacePath = context.workspacePath;
     const fullPath = path.resolve(workspacePath, dirPath);
     if (!fullPath.startsWith(workspacePath)) return "❌ Access denied";

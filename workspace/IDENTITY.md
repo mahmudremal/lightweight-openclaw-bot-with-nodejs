@@ -1,4 +1,4 @@
-# IDENTITY.md - instructions
+instructions
 
 # Identity
 

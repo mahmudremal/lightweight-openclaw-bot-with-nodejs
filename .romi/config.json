@@ -3,12 +3,16 @@
     "host": "0.0.0.0",
     "port": 8123
   },
+  "dashboard": {
+    "port": 8124,
+    "token": "somerandomstring"
+  },
   "agents": {
     "defaults": {
       "workspace": "default",
       "restrict_to_workspace": true,
       "provider": "openai",
-      "model": "glm-5:cloud",
+      "model": "jewelzufo/unsloth_granite-4.0-h-350m-GGUF",
       "max_tokens": 8192,
       "temperature": 0.7,
       "max_tool_iterations": 20,

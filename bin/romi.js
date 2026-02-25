@@ -64,7 +64,37 @@ process.on("SIGTERM", cleanup);
 const rl = readline.createInterface({
   input: process.stdin,
   output: process.stdout,
+  completer: (line) => {
+    // Basic autocomplete for / (skills) and @ (files)
+    const lastWord = line.split(/\s+/).pop();
+
+    if (lastWord.startsWith("/")) {
+      const skillsDir = path.resolve(process.cwd(), "workspace", "skills");
+      if (fs.existsSync(skillsDir)) {
+        const skills = fs
+          .readdirSync(skillsDir, { withFileTypes: true })
+          .filter((d) => d.isDirectory())
+          .map((d) => `/${d.name}`);
+        const hits = skills.filter((s) => s.startsWith(lastWord));
+        return [hits.length ? hits : skills, lastWord];
+      }
+    }
+
+    if (lastWord.startsWith("@")) {
+      const dir = process.cwd();
+      const files = fs
+        .readdirSync(dir, { withFileTypes: true })
+        .filter((f) => !f.isDirectory())
+        .map((f) => `@${f.name}`);
+      const hits = files.filter((f) => f.startsWith(lastWord));
+      return [hits.length ? hits : files, lastWord];
+    }
+
+    return [[], line];
+  },
 });
+
+import fs from "fs";
 
 function askQuestion(query) {
   return new Promise((resolve) => rl.question(query, resolve));
@@ -162,6 +192,21 @@ program
         Array.isArray(message) ? message.join(" ") : message,
       );
       logger.log("ROMI", "Message sent.");
+      process.exit(0);
+    } catch (err) {
+      logger.error("ROMI", err.message);
+      process.exit(1);
+    }
+  });
+
+program
+  .command("dashboard")
+  .description("Open dashboard web interface")
+  .option("-w, --workspace <name>", "Specify the workspace to use")
+  .action(async (to, message, opts) => {
+    try {
+      // like an url will open on default browser `http://localhost:${config.dashboard.port}?token={config.dashboard.token}`
+      logger.log("ROMI", "Dashboard Opened.");
       process.exit(0);
     } catch (err) {
       logger.error("ROMI", err.message);

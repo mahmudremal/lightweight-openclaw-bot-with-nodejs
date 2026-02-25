@@ -13,3 +13,14 @@ export function getWorkspacePath(workspaceId) {
   if (!workspaceId) return WORKSPACES_DIR;
   return path.resolve(WORKSPACES_DIR, workspaceId);
 }
+
+export function rootify(path) {
+  const filePath = path.startsWith("/")
+    ? path.slice(1)
+    : path.startsWith("./")
+      ? path.slice(2)
+      : path.startsWith("~/")
+        ? path.slice(2)
+        : path;
+  return filePath;
+}

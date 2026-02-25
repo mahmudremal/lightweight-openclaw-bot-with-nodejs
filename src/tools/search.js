@@ -5,15 +5,17 @@
 
 import { performSearch } from "./duckduckgo.js";
 
+// here we got an issue. LLM is using this search funciton on various places where it suppose to use different funciton. so give proper description to llm will understant this funciton should only be used to get google search result on google search. nothing else. cause other internal search shouldn't be through this.
 export default {
   name: "search",
-  description: "Search the web using DuckDuckGo. Use this to find information, answer questions about current events, or research topics.",
+  description:
+    "Search the web using DuckDuckGo. Use this to find information, answer questions about current events, or research topics.",
   parameters: {
     type: "object",
     properties: {
       query: {
         type: "string",
-        description: "The search query"
+        description: "The search query",
       },
     },
     required: ["query"],
