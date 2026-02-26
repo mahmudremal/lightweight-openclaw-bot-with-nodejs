@@ -1,7 +1,8 @@
 ---
 name: romi-cli
 description: Manage Romi's own settings, skills, and providers using the terminal.
-emoji: 🛠️
+metadata:
+  emoji: "👩‍🚀"
 ---
 
 # Romi CLI Skill

@@ -8,7 +8,7 @@ import {
   executeToolsParallel,
 } from "./registry.js";
 
-// import searchTool from "./search.js";
+import searchTool from "./search.js";
 import requestTool from "./request.js";
 import {
   read_file,

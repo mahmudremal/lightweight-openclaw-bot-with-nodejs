@@ -1,6 +1,4 @@
-You have access to various tools to perform actions and manage memory. When you need to use a tool, reply with a tool call. If the model supports native tool calling, use it. Otherwise, use this JSON format:
-
-{"tool": "tool_name", "args": {"arg1": "value"}}
+You have access to various tools to perform actions and manage memory on demands. When you need to use a tool, reply with a tool call.
 
 ### Memory Folders
 
@@ -13,6 +11,5 @@ You have access to various tools to perform actions and manage memory. When you 
 
 ### Important Rules
 
-- NEVER respond with JSON unless you are calling a tool.
-- Return only ONE tool call at a time.
-- For normal conversation, reply with plain text.
+- Return only ONE tool call at a time if you required to use a tool.
+- For normal conversation, reply with plain text, No markdown.

@@ -1,6 +1,7 @@
 import { processMessage } from "../core/agent.js";
 import fs from "fs";
 import path from "path";
+import { getActiveWorkspaceId, getWorkspacePath } from "../core/workspace.js";
 
 class Terminal {
   constructor() {
@@ -14,7 +15,10 @@ class Terminal {
     let expandedText = text;
 
     for (const match of fileMatches) {
-      const fileName = match.slice(1);
+      const fileName = path.resolve(
+        getWorkspacePath(getActiveWorkspaceId()),
+        match.slice(1),
+      );
       try {
         if (fs.existsSync(fileName)) {
           const content = fs.readFileSync(fileName, "utf8");
@@ -31,9 +35,8 @@ class Terminal {
       if (this.EXIT_COMMANDS.has(match.toLowerCase())) continue;
 
       try {
-        const skillPath = path.join(
-          process.cwd(),
-          "workspace",
+        const skillPath = path.resolve(
+          getWorkspacePath(getActiveWorkspaceId()),
           "skills",
           skillName,
           "SKILL.md",
@@ -42,7 +45,7 @@ class Terminal {
           const content = fs.readFileSync(skillPath, "utf8");
           expandedText = expandedText.replace(
             match,
-            `[Skill: ${skillName}]\n${content}\n`,
+            `\n\n[Skill: ${skillName}]\n${content}\n\n`,
           );
         }
       } catch (e) {}

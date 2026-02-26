@@ -7,10 +7,10 @@
     "romi": "bin/romi.js"
   },
   "scripts": {
-    "start": "node ./bin/romi.js start",
-    "chat": "node ./bin/romi.js chat",
-    "server": "node ./bin/romi.js server",
-    "init": "node ./bin/romi.js init"
+    "start": "node ./bin/romi.js start --use-system-ca",
+    "chat": "node ./bin/romi.js chat --use-system-ca",
+    "server": "node ./bin/romi.js server --use-system-ca",
+    "init": "node ./bin/romi.js init --use-system-ca"
   },
   "dependencies": {
     "@whiskeysockets/baileys": "^7.0.0-rc.9",

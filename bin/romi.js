@@ -65,8 +65,11 @@ const rl = readline.createInterface({
   input: process.stdin,
   output: process.stdout,
   completer: (line) => {
+    // console.log(line);
     // Basic autocomplete for / (skills) and @ (files)
     const lastWord = line.split(/\s+/).pop();
+
+    console.log(lastWord);
 
     if (lastWord.startsWith("/")) {
       const skillsDir = path.resolve(process.cwd(), "workspace", "skills");
@@ -99,6 +102,19 @@ import fs from "fs";
 function askQuestion(query) {
   return new Promise((resolve) => rl.question(query, resolve));
 }
+
+// program
+//   .command("test")
+//   .description("Start server + scheduler + heartbeat + whatsapp")
+//   .option("-p, --port <n>", "server port", PORT)
+//   .option("-w, --workspace <name>", "Specify the workspace to use")
+//   .action(async (opts) => {
+//     fetch("https://urmoonlitmeadow.uxndev.com/wp-json/store/agent/products")
+//       .then((res) => res.json())
+//       .then(console.log)
+//       .catch(console.error)
+//       .finally(() => process.exit(0));
+//   });
 
 program
   .command("start")

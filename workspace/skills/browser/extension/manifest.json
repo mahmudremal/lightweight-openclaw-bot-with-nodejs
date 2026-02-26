@@ -1,0 +1,47 @@
+{
+  "manifest_version": 3,
+  "name": "Romi Browser - Control",
+  "version": "1.0.0",
+  "description": "Control Browser used by LLM for romi bot assistant or ...",
+  "permissions": [
+    "storage",
+    "tabs",
+    "webRequest",
+    "webNavigation",
+    "debugger",
+    "scripting"
+  ],
+  "host_permissions": ["http://*/*", "https://*/*"],
+  "background": {
+    "service_worker": "scripts/background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_popup": "scripts/index.html",
+    "default_icon": {
+      "16": "icons/icon.png",
+      "32": "icons/icon.png",
+      "48": "icons/icon.png",
+      "128": "icons/icon.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon.png",
+    "32": "icons/icon.png",
+    "48": "icons/icon.png",
+    "128": "icons/icon.png"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["scripts/content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["scripts/injected.js"],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}

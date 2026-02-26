@@ -23,11 +23,18 @@ const RISKY_COMMANDS = [
   "chown -R",
 ];
 
+// I commented this tool to skip use cause this tools is being called unnecesserily everytime i ask my agent anything. Maybe description didn't made properly. such as see an example of issue
+/**
+ * You: hi
+[Tool] Calling terminal_exec({"command":"echo hi"})
+[Tool] terminal_exec result: hi
+
+see how it unnecesserily use this tool?
+ */
 export const terminal_exec = {
   name: "terminal_exec",
   description:
     "This tool is useful when you need to execute terminal commands.",
-  // Use this to run scripts, check system status, or perform CLI tasks. Never execute risky commands.
   parameters: {
     type: "object",
     properties: {

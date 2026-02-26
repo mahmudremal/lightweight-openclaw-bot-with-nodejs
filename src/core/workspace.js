@@ -107,7 +107,7 @@ class Workspace {
               .map(({ name, description }) => ` - **${name}**: ${description}`)
               .join("\n");
         }
-        return content;
+        return skills?.length ? content : false;
       })
       .filter((c) => c);
 
