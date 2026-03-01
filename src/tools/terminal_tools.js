@@ -33,8 +33,7 @@ see how it unnecesserily use this tool?
  */
 export const terminal_exec = {
   name: "terminal_exec",
-  description:
-    "This tool is useful when you need to execute terminal commands.",
+  description: "Execute a terminal command using this.",
   parameters: {
     type: "object",
     properties: {

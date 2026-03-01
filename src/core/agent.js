@@ -85,7 +85,12 @@ class Agent {
     const sessionKey = `${channel}:${from}`;
     appendHistory(`[${timestamp}] [${channel}] ${from}: ${text}`);
 
-    const systemPrompt = await workspace.loadAgentContext();
+    let systemPrompt = await workspace.loadAgentContext();
+
+    // Add channel context to the system prompt
+    const channelContext = `\n\n### Current Context\nYou are responding on the "${channel}" channel. When replying to the user on this same channel, simply respond with your message directly - do NOT use the send_message tool. The send_message tool is only for sending messages to OTHER channels (like whatsapp, telegram), not for responding to the current conversation.`;
+    systemPrompt += channelContext;
+
     this.addToHistory(sessionKey, { role: "user", content: text });
 
     const tools = getToolsSchema();

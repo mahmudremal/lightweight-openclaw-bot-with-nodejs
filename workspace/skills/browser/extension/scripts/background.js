@@ -1,124 +1,159 @@
-/**
- * Below scripts are copied from another place where they LLM did something using this.
- * But our approatch will be completely different. Our background script will connect with romi bot anytime, with the script, it will connect using websocket or anything else, and get a real time messaging transfer communication between. from LLm, then it will request various commands, background scripts will do things onbehalf of this, and return result back. which will complete it's purpose.
- * Everything needs to be clean, comments free, OOP based.
- *
- * ./content.js is for tab content script which will be used for necessery commands or funcitons.
- */
-
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  const { func, params } = message;
-
-  let url;
-  if (func === "google_search") {
-    url = `https://www.google.com/search?q=${encodeURIComponent(params[0])}`;
-  } else if (func === "open_website") {
-    url = params[0];
+class RomiBrowser {
+  constructor() {
+    this.wsUrl = "ws://localhost:8123";
+    this.ws = null;
+    this.reconnectInterval = null;
+    this.init();
   }
 
-  if (!url) {
-    sendResponse({ success: false, message: "Unknown function" });
-    return;
+  init() {
+    this.connect();
+    chrome.runtime.onMessage.addListener(this.handlePopupMessage.bind(this));
   }
 
-  chrome.tabs.create({ url, active: false }, (tab) => {
-    waitForTabAndExtract(tab.id, { toolFunc: func, params }, (data) => {
-      chrome.tabs.remove(tab.id);
-      sendResponse({
-        success: true,
-        action: func,
-        data: data,
-      });
+  connect() {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) return;
+
+    this.ws = new WebSocket(this.wsUrl);
+
+    this.ws.onopen = () => {
+      if (this.reconnectInterval) {
+        clearInterval(this.reconnectInterval);
+        this.reconnectInterval = null;
+      }
+    };
+
+    this.ws.onclose = () => {
+      if (!this.reconnectInterval) {
+        this.reconnectInterval = setInterval(() => this.connect(), 5000);
+      }
+    };
+
+    this.ws.onmessage = async (event) => {
+      try {
+        const command = JSON.parse(event.data);
+        const result = await this.executeCommand(command);
+        this.ws.send(JSON.stringify({ requestId: command.requestId, result }));
+      } catch (err) {
+        this.ws.send(
+          JSON.stringify({
+            requestId: command?.requestId,
+            result: { error: err.message },
+          }),
+        );
+      }
+    };
+  }
+
+  async executeCommand(command) {
+    const { action, params } = command;
+    const [tab] = await chrome.tabs.query({
+      active: true,
+      currentWindow: true,
     });
-  });
 
-  return true;
-});
+    if (!tab) return { error: "No active tab" };
 
-function waitForTabAndExtract(tabId, { toolFunc, params }, callback) {
-  const listener = (id, changeInfo, tab) => {
-    if (id === tabId && changeInfo.status === "complete") {
-      chrome.tabs.onUpdated.removeListener(listener);
-
-      // Inject script to get text
-      chrome.scripting
-        .executeScript({
-          target: { tabId: tabId },
-          args: [{ toolFunc, params }],
-          func: ({ toolFunc, params }) => {
-            if (toolFunc === "google_search") {
-              let searchResults = [
-                ...document.querySelectorAll(".MjjYud > div"),
-              ]
-                .map((card) => ({
-                  url: [...card.querySelectorAll("a")]
-                    .map((e) => e?.href)
-                    .find((i) => i),
-                  title: [...card.querySelectorAll("h3")]
-                    .map((e) => e?.innerText)
-                    .find((i) => i),
-                  excerpt: [
-                    ...card.querySelectorAll(".kb0PBd.A9Y9g, .ITZIwc.p4wth"),
-                  ]
-                    .map((e) => e?.innerText)
-                    .find((i) => i),
-                }))
-                .filter((i) => i.url && i.title && i.excerpt)
-                .map(
-                  ({ url, title, excerpt }) =>
-                    `Title: ${title}\nURL: ${url}\nExcerpt: ${excerpt}\n`,
-                )
-                .join("\n");
-              const gmb = [...document.querySelectorAll("#jOAHU")]
-                .map((el) => {
-                  return [
-                    [...el.querySelectorAll(".tsRboc, .pxiwBd.EyBRub")]
-                      .map((e) => e.innerText)
-                      .join("\n"),
-                    [
-                      ...el.querySelectorAll(
-                        '.wDYxhc[data-attrid="kc:/common/topic:social media presence"] a',
-                      ),
-                    ]
-                      .map((e) => ({ url: e.href, label: e.innerText }))
-                      .map(({ url, label }) => `${label}: ${url}`)
-                      .join("\n"),
-                  ]
-                    .filter((i) => i)
-                    .join("\n");
-                })
-                .join("\n");
-              if (gmb) {
-                searchResults += "\n" + gmb;
-              }
-              return searchResults || "No search results found.";
-            } else if (toolFunc === "open_website") {
-              const articleBody =
-                document.querySelector("article") ||
-                document.querySelector("main") ||
-                document.body;
-              if (!articleBody) {
-                return null;
-              }
-
-              return articleBody.innerText
-                .replace(/\s+/g, " ")
-                .trim()
-                .substring(0, 10000);
-              // Increased limit for better context
-            } else {
-              return null;
-            }
-          },
-        })
-        .then((results) => {
-          const text = results[0]?.result || null;
-          callback(text || "");
-        })
-        .catch((err) => {
-          callback("Error extracting content: " + err.message);
-        });
+    if (action === "navigate") {
+      await chrome.tabs.update(tab.id, { url: params.url });
+      return { success: true, url: params.url };
     }
-  };
-  chrome.tabs.onUpdated.addListener(listener);
+
+    if (action === "screenshot") {
+      const dataUrl = await chrome.tabs.captureVisibleTab(null, {
+        format: "png",
+      });
+      return { success: true, screenshot: dataUrl };
+    }
+
+    const results = await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      func: this.executeInPage,
+      args: [action, params],
+    });
+
+    return results[0]?.result || { error: "No result" };
+  }
+
+  executeInPage(action, params) {
+    try {
+      const actions = {
+        click: () => {
+          const el = document.querySelector(params.selector);
+          if (!el) throw new Error(`Element not found: ${params.selector}`);
+          el.click();
+          return { success: true };
+        },
+        type: () => {
+          const el = document.querySelector(params.selector);
+          if (!el) throw new Error(`Element not found: ${params.selector}`);
+          el.focus();
+          el.value = params.text;
+          el.dispatchEvent(new Event("input", { bubbles: true }));
+          el.dispatchEvent(new Event("change", { bubbles: true }));
+          return { success: true, text: params.text };
+        },
+        getText: () => {
+          if (params.selector) {
+            const el = document.querySelector(params.selector);
+            if (!el) throw new Error(`Element not found: ${params.selector}`);
+            return { success: true, text: el.innerText };
+          }
+          return { success: true, text: document.body.innerText };
+        },
+        scroll: () => {
+          window.scrollBy({
+            top:
+              (params.direction || "down") === "down"
+                ? params.amount || 300
+                : -(params.amount || 300),
+            behavior: "smooth",
+          });
+          return { success: true };
+        },
+        hover: () => {
+          const el = document.querySelector(params.selector);
+          if (!el) throw new Error(`Element not found: ${params.selector}`);
+          el.dispatchEvent(new MouseEvent("mouseover", { bubbles: true }));
+          return { success: true };
+        },
+        waitFor: () => {
+          return new Promise((resolve) => {
+            const timeout = params.timeout || 5000;
+            const startTime = Date.now();
+            const check = () => {
+              if (document.querySelector(params.selector)) {
+                resolve({ success: true });
+              } else if (Date.now() - startTime > timeout) {
+                resolve({ error: `Timeout waiting for: ${params.selector}` });
+              } else {
+                requestAnimationFrame(check);
+              }
+            };
+            check();
+          });
+        },
+        evaluate: () => {
+          const result = eval(params.script);
+          return { success: true, result };
+        },
+      };
+
+      if (!actions[action]) throw new Error(`Unknown action: ${action}`);
+      return actions[action]();
+    } catch (err) {
+      return { error: err.message };
+    }
+  }
+
+  handlePopupMessage(message, sender, sendResponse) {
+    if (message.type === "getStatus") {
+      sendResponse({
+        connected: this.ws && this.ws.readyState === WebSocket.OPEN,
+      });
+    }
+    return true;
+  }
 }
+
+new RomiBrowser();

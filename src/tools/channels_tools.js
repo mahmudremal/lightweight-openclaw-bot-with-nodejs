@@ -2,7 +2,8 @@ import channels from "../channels/index.js";
 
 export const send_message = {
   name: "send_message",
-  description: "Send a message via a specific channel.",
+  description:
+    "Send a message to an EXTERNAL channels (whatsapp, telegram, etc.)",
   parameters: {
     type: "object",
     properties: {

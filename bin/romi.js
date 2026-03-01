@@ -2,6 +2,9 @@
 import { Command } from "commander";
 import dotenv from "dotenv";
 import Table from "cli-table3";
+import fs from "fs";
+import readline from "readline";
+import path from "path";
 dotenv.config();
 
 import { startServer } from "../src/server.js";
@@ -33,8 +36,6 @@ import {
 } from "../src/core/providerManager.js";
 import browser from "../src/utils/browser.js";
 import logger from "../src/utils/logger.js";
-import readline from "readline";
-import path from "path";
 
 const PORT = 8123;
 const program = new Command();
@@ -96,8 +97,6 @@ const rl = readline.createInterface({
     return [[], line];
   },
 });
-
-import fs from "fs";
 
 function askQuestion(query) {
   return new Promise((resolve) => rl.question(query, resolve));

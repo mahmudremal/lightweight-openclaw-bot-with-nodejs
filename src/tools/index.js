@@ -29,6 +29,8 @@ import {
   delete_cron_job,
 } from "./cron_tools.js";
 import { terminal_exec } from "./terminal_tools.js";
+import { browser_tool, browserController } from "./browser_tool.js";
+import { todo_tool, spawn_subagent } from "./agent_tools.js";
 
 const coreTools = [
   // searchTool,
@@ -46,6 +48,9 @@ const coreTools = [
   update_cron_job,
   delete_cron_job,
   terminal_exec,
+  browser_tool,
+  todo_tool,
+  spawn_subagent,
 ];
 
 export function initializeTools() {

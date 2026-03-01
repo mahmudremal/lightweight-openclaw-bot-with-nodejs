@@ -54,6 +54,40 @@ class Terminal {
     return expandedText;
   }
 
+  formatMarkdown(text) {
+    if (!text) return "";
+
+    let formatted = text;
+
+    // Bold
+    formatted = formatted.replace(/\*\*(.*?)\*\*/g, "\x1b[1m$1\x1b[22m");
+
+    // Italic
+    formatted = formatted.replace(/\*(.*?)\*/g, "\x1b[3m$1\x1b[23m");
+
+    // Inline code
+    formatted = formatted.replace(/`(.*?)`/g, "\x1b[47m\x1b[30m $1 \x1b[0m");
+
+    // Code blocks
+    formatted = formatted.replace(
+      /```(\w+)?\n([\s\S]*?)```/g,
+      (match, lang, code) => {
+        const border = "─".repeat(Math.min(process.stdout.columns || 40, 60));
+        return `\n\x1b[90m┌${border}┐\x1b[0m\n\x1b[32m${code.trim()}\x1b[0m\n\x1b[90m└${border}┘\x1b[0m\n`;
+      },
+    );
+
+    // Headings
+    formatted = formatted.replace(/^# (.*$)/gm, "\x1b[1;35m$1\x1b[0m");
+    formatted = formatted.replace(/^## (.*$)/gm, "\x1b[1;34m$1\x1b[0m");
+    formatted = formatted.replace(/^### (.*$)/gm, "\x1b[1;36m$1\x1b[0m");
+
+    // Lists
+    formatted = formatted.replace(/^\s*[-*]\s+(.*$)/gm, " • \x1b[37m$1\x1b[0m");
+
+    return formatted;
+  }
+
   startChat(rl) {
     console.log("\n🐪 Romi — Interactive Chat");
     console.log("Type your message. Type 'exit' to quit.");
@@ -94,7 +128,9 @@ class Terminal {
               }
             },
           });
-          console.log(`\r\x1b[K\n\x1b[33mRomi:\x1b[0m ${reply}\n`);
+          console.log(
+            `\r\x1b[K\n\x1b[33mRomi:\x1b[0m\n${this.formatMarkdown(reply)}\n`,
+          );
         } catch (err) {
           console.error(`\x1b[31mError:\x1b[0m ${err.message}\n`);
         }

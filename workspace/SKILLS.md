@@ -1,19 +1,15 @@
 # Skills Usage
 
-Skills define _how_ tools work. This file is for _your_ specifics — the stuff that's unique to your setup.
-
-You may have access to a variety of skills that extend your capabilities.
+Skills define _how_ tools should be used for specific domains. They extend your capabilities with domain-specific knowledge and patterns.
 
 ## How to use skills:
 
-1. If a task relates to any of these skills, you **MUST** first read the skill's documentation using `read_file`.
-2. If a skill name is 'abcd' so the skill file is in `skills/abcd/SKILL.md`, Cause on every skills, there should have file `SKILL.md` which you need to read on necessity. Rememeber the file path.
-3. Follow the instructions and patterns documented in the skill to perform the job effectively.
+1. **Identify**: When a task relates to a domain (e.g., browser, romi-cli), identify the relevant skill in the `skills/` directory.
+2. **Read**: You **MUST** read the skill's documentation file located at `skills/[skill-name]/SKILL.md` before proceeding.
+3. **Apply**: Follow the specific instructions, patterns, and tool usage documented in that `SKILL.md` file.
 
 ## Why Separate?
 
-Skills are shared. Your setup is yours. Keeping them apart means you can update skills without losing your notes, and share skills without leaking your infrastructure.
-
-Add whatever helps you do your job. This is your cheat sheet.
+Skills are modular and shared. Keeping them in separate directories with their own `SKILL.md` allows for easy updates and sharing without affecting your core configuration.
 
 # Available skills
