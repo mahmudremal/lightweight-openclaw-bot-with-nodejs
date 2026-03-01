@@ -1,7 +1,7 @@
 {
   "gateway": {
     "host": "0.0.0.0",
-    "port": 8123
+    "port": 8765
   },
   "dashboard": {
     "port": 8124,
@@ -47,7 +47,7 @@
     },
     "telegram": {
       "enabled": true,
-      "token": "8158911111:AAGHEnBWBUmIwBeoz9VY9wstNyMMza8WqcA",
+      "token": "8158911681:AAGHEnBWBUmIwBeoz9VY9wstNyMMza8WqcA",
       "proxy": "",
       "allow_from": ["@mahmudremal"]
     }

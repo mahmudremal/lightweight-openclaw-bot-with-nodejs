@@ -1,4 +1,4 @@
-import WebSocket from "ws";
+import { WebSocketServer } from "ws";
 import logger from "../utils/logger.js";
 
 class BrowserController {
@@ -9,11 +9,22 @@ class BrowserController {
     this.requestId = 0;
   }
 
-  startServer({ server, port = 8765 }) {
+  startServer({ server, port = 8765, path = "/ws/browser" }) {
     if (this.wsServer) return;
 
-    // TypeError: WebSocket.Server is not a constructor - see here it shows this error
-    this.wsServer = new WebSocket.Server({ port });
+    if (server) {
+      this.wsServer = new WebSocketServer({ server, path });
+      logger.info(
+        "BROWSER_TOOL",
+        `WebSocket server attached to Express on ${path}`,
+      );
+    } else {
+      this.wsServer = new WebSocketServer({ port, path });
+      logger.info(
+        "BROWSER_TOOL",
+        `WebSocket server started on port ${port} at ${path}`,
+      );
+    }
 
     this.wsServer.on("connection", (ws) => {
       logger.info("BROWSER_TOOL", "Browser extension connected");
@@ -37,8 +48,6 @@ class BrowserController {
         logger.info("BROWSER_TOOL", "Browser extension disconnected");
       });
     });
-
-    logger.info("BROWSER_TOOL", `WebSocket server started on port ${port}`);
   }
 
   hasConnectedClient() {

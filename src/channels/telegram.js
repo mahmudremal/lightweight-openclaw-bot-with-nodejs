@@ -2,6 +2,7 @@ import { Telegraf } from "telegraf";
 import config from "../config/index.js";
 import logger from "../utils/logger.js";
 import { processMessage } from "../core/agent.js";
+import Formatter from "../utils/formatter.js";
 
 class Telegram {
   constructor() {
@@ -23,6 +24,7 @@ class Telegram {
       return;
     }
 
+    // logger.info("TELEGRAM", "Telegram token is " + tgConfig.token);
     this.bot = new Telegraf(tgConfig.token);
 
     this.bot.start((ctx) => {
@@ -35,20 +37,40 @@ class Telegram {
 
     this.bot.on("message", async (ctx) => {
       try {
-        const from = `telegram:${ctx.from.id}`;
+        const from = ctx.chat.id;
+        const senderId = ctx.from.id;
+        const username = ctx.from.username ? `@${ctx.from.username}` : null;
         const body = ctx.message.text || "";
 
         if (!body) return; // Ignore non-text messages for now
 
-        logger.log("TELEGRAM", `[TG] ${from} -> ${body}`);
+        const isGroup = ctx.chat.type !== "private";
+        const senderName =
+          ctx.from.first_name || ctx.from.username || String(senderId);
+        const isOwner =
+          tgConfig.allow_from?.includes(String(senderId)) ||
+          (username && tgConfig.allow_from?.includes(username));
+
+        logger.log(
+          "TELEGRAM",
+          `[TG] ${isGroup ? "[GROUP] " : ""}${from} (from: ${senderName}) -> ${body}`,
+        );
 
         const reply = await processMessage(body, {
           channel: "telegram",
-          from,
+          from: String(from),
+          senderId: String(senderId),
+          senderName,
+          isGroup,
+          isOwner,
           ctx,
         });
 
-        if (reply) await ctx.reply(reply);
+        if (reply) {
+          await ctx.reply(Formatter.toTelegramHTML(reply), {
+            parse_mode: "HTML",
+          });
+        }
       } catch (err) {
         logger.error("TELEGRAM", "Error handling incoming TG message:", err);
       }
@@ -77,7 +99,10 @@ class Telegram {
 
     try {
       // 'to' should be the chat ID
-      return await this.bot.telegram.sendMessage(to, message);
+      const formatted = Formatter.toTelegramHTML(message);
+      return await this.bot.telegram.sendMessage(to, formatted, {
+        parse_mode: "HTML",
+      });
     } catch (err) {
       logger.error("TELEGRAM", "sendMessage error:", err.message);
       throw err;

@@ -1,6 +1,6 @@
 class RomiBrowser {
   constructor() {
-    this.wsUrl = "ws://localhost:8123";
+    this.wsUrl = "ws://localhost:8765";
     this.ws = null;
     this.reconnectInterval = null;
     this.init();

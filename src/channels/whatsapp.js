@@ -7,10 +7,12 @@ import {
 import qrcode from "qrcode-terminal";
 import path from "path";
 import fs from "fs-extra";
+import pino from "pino";
 import { processMessage } from "../core/agent.js";
 import logger from "../utils/logger.js";
 import { ROOT_DIR } from "../core/workspace.js";
 import config from "../config/index.js";
+import Formatter from "../utils/formatter.js";
 
 class WhatsApp {
   constructor() {
@@ -38,8 +40,8 @@ class WhatsApp {
     this.sock = makeWASocket({
       version,
       auth: state,
-      printQRInTerminal: false, // We'll handle it manually for better logging
-      logger: undefined, // Replace with internal logger if needed
+      printQRInTerminal: false,
+      logger: pino({ level: "silent" }),
     });
 
     this.sock.ev.on("creds.update", saveCreds);
@@ -76,19 +78,36 @@ class WhatsApp {
         if (!msg.message || msg.key.fromMe) continue;
 
         const from = msg.key.remoteJid;
+        const sender = msg.key.participant || msg.key.remoteJid;
+        const isGroup = from.endsWith("@g.us");
         const text =
           msg.message.conversation ||
           msg.message.extendedTextMessage?.text ||
+          msg.message.buttonsResponseMessage?.selectedButtonId ||
+          msg.message.listResponseMessage?.singleSelectReply?.selectedRowId ||
           "";
 
         if (!text) continue;
 
-        logger.log("WHATSAPP", `[WA] ${from} -> ${text}`);
+        const senderPhone = sender.split("@")[0];
+        const senderName = msg.pushName || senderPhone;
+        const isOwner =
+          waConfig.allow_from?.includes(`+${senderPhone}`) ||
+          waConfig.allow_from?.includes(senderPhone);
+
+        logger.log(
+          "WHATSAPP",
+          `[WA] ${isGroup ? "[GROUP] " : ""}${from} (${senderName}) -> ${text}`,
+        );
 
         try {
           const reply = await processMessage(text, {
             channel: "whatsapp",
-            from: `whatsapp:${from}`,
+            from: from,
+            senderId: sender,
+            senderName,
+            isGroup,
+            isOwner,
             message: msg,
           });
 
@@ -120,7 +139,8 @@ class WhatsApp {
     }
 
     try {
-      return await this.sock.sendMessage(jid, { text: message });
+      const formattedMessage = Formatter.toWhatsApp(message);
+      return await this.sock.sendMessage(jid, { text: formattedMessage });
     } catch (err) {
       logger.error("WHATSAPP", "sendMessage error:", err.message);
       throw err;

@@ -7,7 +7,7 @@ import readline from "readline";
 import path from "path";
 dotenv.config();
 
-import { startServer } from "../src/server.js";
+import romiServer from "../src/server.js";
 import cron from "../src/scheduler/cron.js";
 import heartbeat from "../src/scheduler/heartbeat.js";
 import channels from "../src/channels/index.js";
@@ -37,7 +37,7 @@ import {
 import browser from "../src/utils/browser.js";
 import logger from "../src/utils/logger.js";
 
-const PORT = 8123;
+const PORT = 8765;
 const program = new Command();
 program
   .name("romi")
@@ -52,6 +52,7 @@ async function cleanup() {
   try {
     if (heartbeat) heartbeat.stop();
     if (cron) cron.stop();
+    romiServer.stop();
     await browser.close();
     process.exit(0);
   } catch (err) {
@@ -102,19 +103,6 @@ function askQuestion(query) {
   return new Promise((resolve) => rl.question(query, resolve));
 }
 
-// program
-//   .command("test")
-//   .description("Start server + scheduler + heartbeat + whatsapp")
-//   .option("-p, --port <n>", "server port", PORT)
-//   .option("-w, --workspace <name>", "Specify the workspace to use")
-//   .action(async (opts) => {
-//     fetch("https://urmoonlitmeadow.uxndev.com/wp-json/store/agent/products")
-//       .then((res) => res.json())
-//       .then(console.log)
-//       .catch(console.error)
-//       .finally(() => process.exit(0));
-//   });
-
 program
   .command("start")
   .description("Start server + scheduler + heartbeat + whatsapp")
@@ -127,7 +115,7 @@ program
       `Starting services in workspace: '${getActiveWorkspaceId()}'`,
     );
 
-    startServer(Number(opts.port));
+    await romiServer.start(Number(opts.port));
     await cron.init();
     await heartbeat.start();
     await channels.init();
@@ -156,6 +144,7 @@ program
       const reply = await processMessage(text, {
         channel: "cli",
         from: "cli:user",
+        isOwner: true,
       });
       logger.log("ROMI", reply);
       process.exit(0);
@@ -173,7 +162,7 @@ program
   .action(async (opts) => {
     const workspaceName = await resolveWorkspace(opts.workspace);
     logger.info("ROMI", `Starting server in workspace: '${workspaceName}'`);
-    startServer(Number(opts.port));
+    await romiServer.start(Number(opts.port));
   });
 
 program
@@ -317,31 +306,63 @@ skills
     process.exit(0);
   });
 
-// Providers management
-const providers = program
-  .command("providers")
-  .description("Manage message providers (active/inactive)");
+// Channel management
+const channelsCmd = program
+  .command("channel")
+  .alias("channels")
+  .description("Manage communication channels (whatsapp, telegram, etc.)");
 
-providers
+channelsCmd
   .command("list")
-  .description("List all message providers")
+  .description("List all available and configured channels")
   .action(async () => {
     const list = await listProviders();
     const table = new Table({ head: ["Name", "Status"] });
     list.forEach((p) =>
-      table.push([p.name, p.active ? "Active ✅" : "Inactive ❌"]),
+      table.push([p.name, p.active ? "Enabled ✅" : "Disabled ❌"]),
     );
     console.log(table.toString());
     process.exit(0);
   });
 
-providers
-  .command("add <name>")
-  .description("Add/Activate a provider")
+channelsCmd
+  .command("enable <name>")
+  .description("Enable a channel")
   .action(async (name) => {
-    const result = await addProvider(name);
+    const result = await toggleProvider(name, true);
     logger.info("ROMI", result);
     process.exit(0);
+  });
+
+channelsCmd
+  .command("disable <name>")
+  .description("Disable a channel")
+  .action(async (name) => {
+    const result = await toggleProvider(name, false);
+    logger.info("ROMI", result);
+    process.exit(0);
+  });
+
+channelsCmd
+  .command("set <channel> <key> <value>")
+  .description("Set channel configuration (e.g., set telegram token <token>)")
+  .action(async (channel, key, value) => {
+    const result = await setChannelConfig(channel, key, value);
+    logger.info("ROMI", result);
+    process.exit(0);
+  });
+
+channelsCmd
+  .command("login <channel>")
+  .description("Authenticate/Initialize a channel (e.g., WhatsApp QR)")
+  .action(async (channel) => {
+    const chan = channels.getChannel(channel);
+    if (!chan) {
+      logger.error("ROMI", `Channel '${channel}' not found.`);
+      process.exit(1);
+    }
+    logger.info("ROMI", `Initializing ${channel}...`);
+    await chan.init();
   });
 
 program

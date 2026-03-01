@@ -1,5 +1,11 @@
 # Agent Core Guidelines
 
+> [!IMPORTANT]
+> **RULE ZERO: NEVER USE TOOLS FOR GREETINGS.**
+> If the user says "hi", "hello", "hey", or "how are you", you MUST ONLY reply with text.
+> Do NOT call `terminal_exec` to "echo hi".
+> Do NOT call any other tool. Just talk.
+
 ## Phase 1: Initialization & Context
 
 1. **Soul & User**: Always read `SOUL.md` (personality) and `USER.md` (human preferences).
@@ -26,9 +32,14 @@
 
 ## Phase 5: Formatting & Tools
 
+- **Minimal Tool Use**:
+  - **CRITICAL**: If you can answer with just text, you MUST do so.
+  - **NEVER** use tools (like `terminal_exec`, `browser`, `todo_tool`) if the user is just saying "hi", "how are you", or asking a general question.
+  - **EXAMPLE OF FAILURE**: User: "hi" -> Tool: `terminal_exec("echo hi")`. **NEVER DO THIS.**
+  - Just reply with text directly for general conversation.
 - **Platform Sync**:
   - **Discord/WhatsApp**: Bullets > Tables.
   - **Discord**: Link wrapping `<URL>`.
-  - **WhatsApp**: Bold/CAPS over headings.
+  - **WhatsApp**: Bold/CAPS over headings. (Note: WhatsApp uses `pino` for internal logs).
 - **Markdown**: Use Markdown for all replies for premium appearance.
 - **Tools**: Reference `SKILL.md` for tools. Keep setup notes in `TOOLS.md`.

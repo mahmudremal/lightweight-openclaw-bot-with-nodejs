@@ -33,7 +33,8 @@ see how it unnecesserily use this tool?
  */
 export const terminal_exec = {
   name: "terminal_exec",
-  description: "Execute a terminal command using this.",
+  description:
+    "Execute commands on the local machine's terminal. Use ONLY for essential technical tasks (file operations, installs, tests). NEVER use this for simple greetings like 'hi' or general conversation. Avoid using this to 'open' apps like 'browser' or 'chrome' unless specifically asked to run a CLI script.",
   parameters: {
     type: "object",
     properties: {

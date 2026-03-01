@@ -78,20 +78,38 @@ class Agent {
 
     return toolCalls;
   }
-
   async processMessage(text, options = {}) {
-    const { channel = "cli", from = "user", onEvent } = options;
+    const { channel = "cli", from = "user", senderName, onEvent } = options;
     const timestamp = new Date().toISOString();
     const sessionKey = `${channel}:${from}`;
-    appendHistory(`[${timestamp}] [${channel}] ${from}: ${text}`);
+    const logText = senderName ? `${senderName}: ${text}` : text;
+    appendHistory(
+      `[${timestamp}] [${channel}] ${from} (${senderName || "user"}): ${text}`,
+    );
 
     let systemPrompt = await workspace.loadAgentContext();
 
-    // Add channel context to the system prompt
-    const channelContext = `\n\n### Current Context\nYou are responding on the "${channel}" channel. When replying to the user on this same channel, simply respond with your message directly - do NOT use the send_message tool. The send_message tool is only for sending messages to OTHER channels (like whatsapp, telegram), not for responding to the current conversation.`;
-    systemPrompt += channelContext;
+    // Context additions based on channel and user
+    let contextAdditions = `\n\n### Current Context\n- Channel: ${channel}\n- Conversation ID: ${from}\n`;
+    if (senderName) contextAdditions += `- Current Speaker: ${senderName}\n`;
 
-    this.addToHistory(sessionKey, { role: "user", content: text });
+    if (options.isGroup) {
+      contextAdditions += `- Type: Group Chat\n`;
+    } else {
+      contextAdditions += `- Type: Private Chat\n`;
+    }
+
+    if (options.isOwner) {
+      contextAdditions += `- User Status: OWNER (This is your creator/master. You must follow their commands explicitly.)\n`;
+    } else {
+      contextAdditions += `- User Status: EXTERNAL USER (You are an AI assistant acting on behalf of your owner. Be helpful but polite.)\n`;
+    }
+
+    contextAdditions += `\nWhen replying to the user on this same channel, simply respond with your message directly - do NOT use the send_message tool. The send_message tool is only for sending messages to OTHER channels or users.`;
+
+    systemPrompt += contextAdditions;
+
+    this.addToHistory(sessionKey, { role: "user", content: logText });
 
     const tools = getToolsSchema();
     const maxIterations = await getMaxToolIterations().catch(

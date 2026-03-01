@@ -114,6 +114,7 @@ class Terminal {
           const reply = await processMessage(expandedText, {
             channel: "cli",
             from: "cli:user",
+            isOwner: true,
             onEvent: (event) => {
               if (event.type === "tool_start") {
                 event.toolCalls.forEach((call) => {
