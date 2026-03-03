@@ -43,13 +43,15 @@
       "enabled": true,
       "provider": "whatsapp-web.js",
       "bridge_url": "ws://localhost:3001",
-      "allow_from": ["+8801814118328"]
+      "allow_from": ["+8801814118328"],
+      "human": ["+8801814118328"]
     },
     "telegram": {
       "enabled": true,
       "token": "8158911681:AAGHEnBWBUmIwBeoz9VY9wstNyMMza8WqcA",
       "proxy": "",
-      "allow_from": ["@mahmudremal"]
+      "allow_from": ["@mahmudremal"],
+      "human": ["@mahmudremal"]
     }
   },
   "providers": {

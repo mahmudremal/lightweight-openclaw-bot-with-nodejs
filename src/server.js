@@ -2,7 +2,8 @@ import express from "express";
 import bodyParser from "body-parser";
 import { processMessage } from "./core/agent.js";
 import logger from "./utils/logger.js";
-import { browserController } from "./tools/browser_tool.js";
+import { browserController } from "./utils/browser.js";
+import network from "./utils/network.js";
 
 class RomiServer {
   constructor() {
@@ -10,6 +11,7 @@ class RomiServer {
     this.server = null;
     this.setupMiddleware();
     this.setupRoutes();
+    network.isOnline();
   }
 
   setupMiddleware() {
@@ -38,6 +40,22 @@ class RomiServer {
         res.status(500).json({ ok: false, error: err.message });
       }
     });
+
+    // Internal Browser API
+    this.app.get("/api/browsers", (req, res) => {
+      res.json(browserController.getClientsList());
+    });
+
+    this.app.post("/api/browsers/exec", async (req, res) => {
+      req.setTimeout(0); // Disable request timeout for long-running tasks
+      try {
+        const { id, action, params } = req.body;
+        const result = await browserController.sendCommand(action, params, id);
+        res.json(result);
+      } catch (err) {
+        res.status(500).json({ error: err.message });
+      }
+    });
   }
 
   async start(port = 8765) {
@@ -59,6 +77,7 @@ class RomiServer {
     if (this.server) {
       this.server.close();
       this.server = null;
+      browserController.stopServer();
     }
   }
 }

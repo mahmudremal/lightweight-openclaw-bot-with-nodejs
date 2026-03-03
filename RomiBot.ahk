@@ -1,75 +1,129 @@
 #NoEnv
 #SingleInstance Force
 #Persistent
-Menu, Tray, Icon, %A_ScriptDir%\lobster.ico
+#NoTrayIcon ; We'll show it after setup
+SetWorkingDir %A_ScriptDir%
 
+; --- Configuration ---
+appName := "Romi Bot"
 serverCmd := "romi start"
-dashboardCmd := "romi dashboard"
+dashboardUrl := "http://localhost:8124" ; Standard dashboard URL
+iconPath := A_ScriptDir . "\lobster.ico"
 
-; Start server on launch
+if FileExist(iconPath)
+    Menu, Tray, Icon, %iconPath%
+
+; --- Initialize ---
 Gosub, StartServer
+Menu, Tray, Icon ; Show tray icon now
 
 ; --- Tray Menu ---
 Menu, Tray, NoStandard
-Menu, Tray, Add, Open Status, OpenStatus
+Menu, Tray, Add, %appName% Status, OpenStatus
+Menu, Tray, Default, %appName% Status
 Menu, Tray, Add, Open Dashboard, OpenDashboard
 Menu, Tray, Add
-Menu, Tray, Add, Restart, RestartServer
-Menu, Tray, Add, Quit, QuitApp
-Menu, Tray, Tip, Romi Bot.
+Menu, Tray, Add, Restart Server, RestartServer
+Menu, Tray, Add, Quit Romi, QuitApp
+Menu, Tray, Tip, %appName% is running in background.
 Return
 
-; --- Functions ---
+; --- Core Logic ---
 StartServer:
-    Run, cmd.exe /k %serverCmd%, , Hide, serverPID
+    if (serverPID) {
+        Gosub, StopServer
+    }
+    ; Use /c to close cmd after execution, Hide to keep it in background
+    Run, %comspec% /c %serverCmd%, %A_ScriptDir%, Hide, serverPID
+    if (!serverPID) {
+        MsgBox, 16, Error, Failed to start %appName% server.
+    }
 Return
 
-OpenStatus:
-    statusText := serverPID ? "Running" : "Stopped"
-    statusColor := serverPID ? "4caf50" : "f44336"
-    
-    Gui, StatusGui:Destroy
-    Gui, StatusGui:New, +AlwaysOnTop -MaximizeBox -MinimizeBox +Owner, Server Status
-    Gui, StatusGui:Color, 1a1a1b, 2d2d30
-    Gui, StatusGui:Font, s12 w700 q5 cffffff, Segoe UI
-    Gui, StatusGui:Add, Text, x20 y20 w260 +Center, Romi Bot.
-    
-    Gui, StatusGui:Font, s10 w400 c9aa0a6
-    Gui, StatusGui:Add, Text, x20 y+20 w70, Status:
-    Gui, StatusGui:Font, s10 w600 c%statusColor%
-    Gui, StatusGui:Add, Text, x+5 w180, %statusText%
-    
-    Gui, StatusGui:Font, s10 w400 c9aa0a6
-    Gui, StatusGui:Add, Text, x20 y+10 w70, PID:
-    Gui, StatusGui:Font, s10 w600 c8ab4f8
-    Gui, StatusGui:Add, Text, x+5 w180, % (serverPID ? serverPID : "N/A")
-    
-    Gui, StatusGui:Font, s9 w400 c9aa0a6
-    Gui, StatusGui:Add, Text, x20 y+15 w260, Command:
-    Gui, StatusGui:Font, s8 w400 c666666
-    Gui, StatusGui:Add, Text, x20 y+5 w260 r2, %serverCmd%
-    
-    Gui, StatusGui:Add, Button, x100 y+25 w100 h32 Default gStatusClose, Dismiss
-    
-    Gui, StatusGui:Show, w300 h240
-Return
-
-StatusClose:
-StatusGuiGuiClose:
-StatusGuiGuiEscape:
-    Gui, StatusGui:Destroy
+StopServer:
+    if (serverPID) {
+        ; Use taskkill /F /T to kill the process and all its children (Node.js, etc.)
+        Run, taskkill /F /T /PID %serverPID%, , Hide
+        serverPID := 0
+        Sleep, 500 ; Give it a moment to release ports
+    }
 Return
 
 OpenDashboard:
-    Run, cmd.exe /c %dashboardCmd%, , Hide
+    Run, %dashboardUrl%
 Return
 
 RestartServer:
-    Process, Close, %serverPID%
+    Gosub, StopServer
     Sleep, 1000
     Gosub, StartServer
+    if (GuiVisible)
+        Gosub, OpenStatus
 Return
 
 QuitApp:
-    Process, Close, %serverPID%
+    Gosub, StopServer
     ExitApp
+Return
+
+; --- Professional Status GUI ---
+OpenStatus:
+    GuiVisible := true
+    statusText := serverPID ? "ACTIVE" : "OFFLINE"
+    statusColor := serverPID ? "42b883" : "ff4d4d" ; Emerald vs Coral
+    
+    Gui, StatusGui:Destroy
+    Gui, StatusGui:New, +AlwaysOnTop -MaximizeBox -MinimizeBox +Owner +LastFound, %appName% Control Center
+    Gui, StatusGui:Color, 121212, 1e1e1e
+    
+    ; Header Area
+    Gui, StatusGui:Font, s14 w700 q5 cffffff, Segoe UI
+    Gui, StatusGui:Add, Text, x0 y20 w320 +Center, %appName%
+    
+    ; Indicator Circle (Unicode)
+    Gui, StatusGui:Font, s10 w400 c%statusColor%
+    Gui, StatusGui:Add, Text, x0 y45 w320 +Center, % (serverPID ? "● " : "○ ") . statusText
+    
+    ; Details Box
+    Gui, StatusGui:Font, s9 w400 c808080
+    Gui, StatusGui:Add, Text, x30 y85 w60, Process ID:
+    Gui, StatusGui:Font, s9 w600 cffffff
+    Gui, StatusGui:Add, Text, x+5 w200, % (serverPID ? serverPID : "None")
+    
+    Gui, StatusGui:Font, s9 w400 c808080
+    Gui, StatusGui:Add, Text, x30 y110 w60, Directory:
+    Gui, StatusGui:Font, s8 w300 c606060
+    Gui, StatusGui:Add, Text, x+5 w200 r1, %A_ScriptDir%
+
+    ; Action Buttons
+    Gui, StatusGui:Font, s9 w600 cffffff
+    if (serverPID) {
+        Gui, StatusGui:Add, Button, x30 y150 w125 h35 gRestartServer, ↻ RESTART
+        Gui, StatusGui:Add, Button, x165 y150 w125 h35 gStopServerUI, ■ STOP
+    } else {
+        Gui, StatusGui:Add, Button, x30 y150 w260 h35 gStartServerUI, ▶ START ENGINE
+    }
+    
+    Gui, StatusGui:Add, Button, x30 y195 w260 h30 gOpenDashboard, 🌐 OPEN DASHBOARD
+    
+    Gui, StatusGui:Font, s8 w400 c404040
+    Gui, StatusGui:Add, Text, x0 y245 w320 +Center, Romi Engine v2.0 - Developed by Remal Mahmud
+    
+    Gui, StatusGui:Show, w320 h270
+Return
+
+StartServerUI:
+    Gosub, StartServer
+    Gosub, OpenStatus
+Return
+
+StopServerUI:
+    Gosub, StopServer
+    Gosub, OpenStatus
+Return
+
+StatusGuiGuiClose:
+StatusGuiGuiEscape:
+    GuiVisible := false
+    Gui, StatusGui:Destroy
+Return

@@ -1,6 +1,7 @@
 import fs from "fs-extra";
 import path from "path";
 import { getWorkspacePath, APP_SOURCE_DIR } from "./paths.js";
+import matter from "gray-matter";
 
 class SkillManager {
   constructor() {
@@ -17,25 +18,11 @@ class SkillManager {
   }
 
   parseFrontmatter(content) {
-    const match = content.match(/^---\n([\s\S]*?)\n---/);
-    if (!match) return {};
-    const frontmatter = match[1];
-    const result = {};
-    for (const line of frontmatter.split("\n")) {
-      const colonIndex = line.indexOf(":");
-      if (colonIndex > 0) {
-        const key = line.slice(0, colonIndex).trim();
-        let value = line.slice(colonIndex + 1).trim();
-        if (
-          (value.startsWith('"') && value.endsWith('"')) ||
-          (value.startsWith("'") && value.endsWith("'"))
-        ) {
-          value = value.slice(1, -1);
-        }
-        result[key] = value;
-      }
+    try {
+      return matter(content).data;
+    } catch {
+      return {};
     }
-    return result;
   }
 
   async readSkillMetadata(skillPath) {
@@ -45,26 +32,15 @@ class SkillManager {
     const content = await fs.readFile(skillFile, "utf8");
     const frontmatter = this.parseFrontmatter(content);
 
-    let emoji = "";
-    if (frontmatter.metadata) {
-      try {
-        const metadata =
-          typeof frontmatter.metadata === "string"
-            ? JSON.parse(frontmatter.metadata)
-            : frontmatter.metadata;
-        emoji = metadata?.emoji || metadata?.nanobot?.emoji || "";
-      } catch {
-        const emojiMatch = frontmatter.metadata.match(
-          /emoji["\s:]+["']([^"']+)["']/,
-        );
-        if (emojiMatch) emoji = emojiMatch[1];
-      }
+    let emoji = frontmatter.emoji || "";
+    if (frontmatter.metadata && typeof frontmatter.metadata === "object") {
+      emoji = frontmatter.metadata.emoji || emoji;
     }
 
     return {
       name: frontmatter.name || path.basename(skillPath),
       description: frontmatter.description || "",
-      emoji: emoji || frontmatter.emoji || "",
+      emoji: emoji || "",
       path: skillPath,
     };
   }

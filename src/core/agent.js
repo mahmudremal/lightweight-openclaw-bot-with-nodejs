@@ -173,7 +173,10 @@ class Agent {
         const toolMsg = {
           role: "tool",
           tool_call_id: r.id,
-          content: String(r.result),
+          content:
+            typeof r.result === "string"
+              ? r.result
+              : JSON.stringify(r.result, null, 2),
         };
         this.addToHistory(sessionKey, toolMsg);
         turnToolsResult.push(toolMsg);

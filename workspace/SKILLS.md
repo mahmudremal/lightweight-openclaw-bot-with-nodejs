@@ -1,15 +1,28 @@
-# Skills Usage
+# Skills System 🧠
 
-Skills define _how_ tools should be used for specific domains. They extend your capabilities with domain-specific knowledge and patterns.
+Skills are modular extensions of your capabilities. Each skill contains specialized knowledge, workflows, and helper scripts for a specific domain.
 
-## How to use skills:
+## 🚀 The Skills Workflow
 
-1. **Identify**: When a task relates to a domain (e.g., browser, romi-cli), identify the relevant skill in the `skills/` directory.
-2. **Read**: You **MUST** read the skill's documentation file located at `skills/[skill-name]/SKILL.md` before proceeding.
-3. **Apply**: Follow the specific instructions, patterns, and tool usage documented in that `SKILL.md` file.
+1.  **Identify**: When a task involves a specific domain (e.g., SEO, Email, Browser), locate the corresponding directory in `skills/`.
+2.  **Read**: You **MUST** read `skills/<skill-name>/SKILL.md` before taking any action. It contains the "Source of Truth" for that domain.
+3.  **Execute**: Follow the documented patterns. Use the provided tools and scripts exactly as described.
 
-## Why Separate?
+## 📜 Script Path Resolution
 
-Skills are modular and shared. Keeping them in separate directories with their own `SKILL.md` allows for easy updates and sharing without affecting your core configuration.
+Skills often include helper scripts in their `scripts/` folder. While `SKILL.md` files use shorthand paths for readability, you must resolve them correctly:
 
-# Available skills
+- **Shorthand**: `node scripts/tool.js`
+- **Real Path**: `node skills/<skill-name>/scripts/tool.js`
+
+**Always use the full absolute path when executing scripts via `terminal_exec`.**
+
+## 🏗️ Why Modularize?
+
+- **Context Efficiency**: Instead of loading 1000s of lines of instruction into your prompt, you only "load" what you need for the current task.
+- **Maintainability**: New capabilities can be added or updated without breaking your core logic.
+- **Portability**: Skills can be shared across different workspaces easily.
+
+---
+
+### Available Skills

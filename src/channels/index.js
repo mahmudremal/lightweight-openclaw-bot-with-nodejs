@@ -13,18 +13,18 @@ class Channels {
   }
 
   async init() {
-    this.launchChannels();
-    // events.on("internet:online", this.launchChannels);
+    // this.launchChannels();
+    events.on("internet:online", this.launchChannels);
 
-    events.on("config:invalidated", () => {
-      // Maybe restart channels if config changed?
-      // For now just logging
-      logger.info(
-        "CHANNELS",
-        "Config invalidated, checking for channel updates...",
-      );
-      this.launchChannels();
-    });
+    // events.on("config:invalidated", () => {
+    //   // Maybe restart channels if config changed?
+    //   // For now just logging
+    //   logger.info(
+    //     "CHANNELS",
+    //     "Config invalidated, checking for channel updates...",
+    //   );
+    //   this.launchChannels();
+    // });
   }
 
   async launchChannels() {
@@ -33,7 +33,7 @@ class Channels {
     const channelConfigs = activeConfig.channels || {};
 
     for (const [name, { enabled }] of Object.entries(channelConfigs)) {
-      if (enabled && this.channels[name]) {
+      if (enabled && this.channels?.[name]) {
         logger.info("CHANNELS", `Starting channel: ${name}`);
         try {
           await this.channels[name].init();
@@ -56,6 +56,23 @@ class Channels {
 
   getChannel(name) {
     return this.channels[name];
+  }
+
+  async stopAll() {
+    logger.info("CHANNELS", "Stopping all channels...");
+    for (const [name, channel] of Object.entries(this.channels)) {
+      if (channel.stop) {
+        try {
+          await channel.stop();
+          logger.info("CHANNELS", `Stopped channel: ${name}`);
+        } catch (err) {
+          logger.error(
+            "CHANNELS",
+            `Failed to stop channel ${name}: ${err.message}`,
+          );
+        }
+      }
+    }
   }
 }
 

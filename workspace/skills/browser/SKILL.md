@@ -1,107 +1,95 @@
 ---
 name: browser
-description: Control Chromium Browser using the `browser` tool. Navigate websites, click elements, type text, take screenshots, and execute JavaScript in the browser.
+description: Control Chromium Browser using the `browser` tool. Navigate websites, click elements, write text, take screenshots, and execute JavaScript in the browser.
 metadata:
   emoji: "🌐"
 ---
 
-# Browser Control Skill
+# Browser CLI & Action Reference 🌐
 
-You can control a Chromium browser through the connected Romi browser extension.
+## CLI Usage (via `terminal_exec`)
 
-## Setup
+| Command  | Description                     | Syntax                                        |
+| :------- | :------------------------------ | :-------------------------------------------- |
+| **List** | Show all connected browser IDs  | `romi browsers list`                          |
+| **Exec** | Send direct action to a browser | `romi browser exec <id> <action> [key=value]` |
 
-1. Install the Romi browser extension from `workspace/skills/browser/extension/`
-   - Open Chrome/Edge and go to `chrome://extensions/`
-   - Enable "Developer mode"
-   - Click "Load unpacked" and select the `extension` folder
+### CLI Example:
 
-2. The extension will automatically connect to Romi when Romi is running
+`terminal_exec({ command: "romi browser exec browser-1 navigate url=https://google.com" })`
 
-## Available Actions
+---
 
-Use the `browser` tool with these actions:
+## Action Reference (Parameters & Usage)
 
-### navigate
-Navigate to a URL.
-```
-browser({ action: "navigate", url: "https://example.com" })
-```
+These actions apply to both the `browser` tool and `romi browser exec`.
 
-### click
-Click an element using a CSS selector.
-```
-browser({ action: "click", selector: "button.submit" })
-browser({ action: "click", selector: "#login-btn" })
-```
+### 0. `create`
 
-### type
-Type text into an input field.
-```
-browser({ action: "type", selector: "input[name='email']", text: "user@example.com" })
-```
+Create a new tab as active tab.
 
-### getText
-Get text content from the page or a specific element.
-```
-browser({ action: "getText" })  // Get all page text
-browser({ action: "getText", selector: ".article-content" })  // Get specific element text
-```
+- **Param:** `url` (String, Required)
+- **Usage:** `create url=https://aljazeera.com`
 
-### screenshot
-Take a screenshot of the current page.
-```
-browser({ action: "screenshot" })
-```
+### 1. `navigate`
 
-### scroll
-Scroll the page up or down.
-```
-browser({ action: "scroll", direction: "down", amount: 300 })
-browser({ action: "scroll", direction: "up", amount: 500 })
-```
+Loads a new URL in the active tab.
 
-### hover
-Hover over an element.
-```
-browser({ action: "hover", selector: ".menu-item" })
-```
+- **Param:** `url` (String, Required)
+- **Usage:** `navigate url=https://aljazeera.com`
 
-### waitFor
-Wait for an element to appear on the page.
-```
-browser({ action: "waitFor", selector: ".results", timeout: 5000 })
-```
+### 2. `click`
 
-### evaluate
-Execute JavaScript in the browser context.
-```
-browser({ action: "evaluate", script: "document.title" })
-browser({ action: "evaluate", script: "Array.from(document.querySelectorAll('a')).map(a => a.href)" })
-```
+Simulates a mouse click on an element.
 
-## Example Workflows
+- **Param:** `selector` (String, Required)
+- **Usage:** `click selector="#login-button"`
 
-### Search Google
-```
-1. browser({ action: "navigate", url: "https://google.com" })
-2. browser({ action: "type", selector: "input[name='q']", text: "search query" })
-3. browser({ action: "click", selector: "input[type='submit']" })
-4. browser({ action: "waitFor", selector: "#search" })
-5. browser({ action: "getText", selector: "#search" })
-```
+### 3. `write`
 
-### Fill a Form
-```
-1. browser({ action: "navigate", url: "https://example.com/login" })
-2. browser({ action: "type", selector: "#email", text: "user@example.com" })
-3. browser({ action: "type", selector: "#password", text: "password123" })
-4. browser({ action: "click", selector: "button[type='submit']" })
-```
+Enters text into an input field.
 
-## Important Notes
+- **Params:** `selector` (Required), `text` (Required), editor (quill|textarea|input) (Optional), keyPress (key,keyCode) (Optional)
+- **Usage:** `write selector="input[name='q']" text="news today" editor=quill keyPress="Enter,13"`
 
-- Always use CSS selectors that are specific and unlikely to change
-- Wait for elements to load before interacting with them
-- Take screenshots to verify the current state of the page
-- If an action fails, try using `waitFor` to ensure the element is ready
+### 4. `getText`
+
+Extracts text content. Limited to 20,000 characters.
+
+- **Param:** `selector` (Optional)
+- **Usage:** `getText selector=".article-body"` (Omit selector for full page text)
+
+### 5. `screenshot`
+
+Captures current page view.
+
+- **Returns:** Confirmation message.
+
+### 6. `waitFor`
+
+Pauses execution until a specific element exists in the DOM.
+
+- **Param:** `selector` (String, Required), `timeout` (Number, default 5000ms)
+- **Usage:** `waitFor selector=".results-loaded" timeout=10000`
+
+### 7. `scroll`
+
+Scrolls the active tab.
+
+- **Params:** `direction` ("up"|"down"), `amount` (Pixels)
+- **Usage:** `scroll direction=down amount=500`
+
+### 8. `evaluate`
+
+Executes raw JavaScript and returns the result.
+
+- **Param:** `script` (String, Required)
+- **Usage:** `evaluate script="document.title"`
+
+---
+
+## Technical Notes
+
+- **Bridge**: If using `browser` tool from CLI, it automatically bridges to the process running `romi start`.
+- **Selectors**: Supports all standard CSS3 selectors.
+- **Latency**: Heavy SPAs (React/Vue) require `waitFor` before interaction.

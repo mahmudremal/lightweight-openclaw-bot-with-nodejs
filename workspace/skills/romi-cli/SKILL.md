@@ -16,6 +16,7 @@ This skill allows Romi to manage itself by executing `romi` commands via the ter
 - Manage providers: `romi providers list`, `romi providers add <name>`
 - Initialize workspaces: `romi init <name>`
 - Run other cli tasks via `terminal_exec`.
+- Read browser skill if available and needed to control browser.
 
 ## Instructions
 

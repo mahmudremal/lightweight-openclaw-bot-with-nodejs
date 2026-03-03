@@ -18,6 +18,8 @@ class WhatsApp {
   constructor() {
     this.sock = null;
     this.authState = null;
+    this.retryCount = 0;
+    this.reconnectTimeout = null;
   }
 
   async init() {
@@ -64,9 +66,25 @@ class WhatsApp {
         );
         if (shouldReconnect) {
           this.sock = null;
-          this.init();
+          this.retryCount++;
+          const delays = [2000, 4000, 30000, 60000];
+          const delay =
+            delays[Math.min(this.retryCount - 1, delays.length - 1)];
+
+          logger.info(
+            "WHATSAPP",
+            `Retrying connection in ${delay / 1000}s (Attempt ${this.retryCount})`,
+          );
+
+          if (this.reconnectTimeout) clearTimeout(this.reconnectTimeout);
+          this.reconnectTimeout = setTimeout(() => this.init(), delay);
         }
       } else if (connection === "open") {
+        this.retryCount = 0;
+        if (this.reconnectTimeout) {
+          clearTimeout(this.reconnectTimeout);
+          this.reconnectTimeout = null;
+        }
         logger.log("WHATSAPP", "WhatsApp connection opened successfully");
       }
     });
@@ -92,8 +110,28 @@ class WhatsApp {
         const senderPhone = sender.split("@")[0];
         const senderName = msg.pushName || senderPhone;
         const isOwner =
-          waConfig.allow_from?.includes(`+${senderPhone}`) ||
-          waConfig.allow_from?.includes(senderPhone);
+          waConfig.human?.some(
+            (h) =>
+              h.includes(senderPhone) ||
+              senderPhone.includes(h.replace("+", "")),
+          ) || false;
+
+        const isAllowed =
+          !waConfig.allow_from ||
+          waConfig.allow_from.length === 0 ||
+          waConfig.allow_from.some(
+            (h) =>
+              h.includes(senderPhone) ||
+              senderPhone.includes(h.replace("+", "")),
+          );
+
+        if (!isAllowed) {
+          logger.debug(
+            "WHATSAPP",
+            `Ignoring message from ${senderPhone} (not in allow_from)`,
+          );
+          continue;
+        }
 
         logger.log(
           "WHATSAPP",
@@ -101,6 +139,12 @@ class WhatsApp {
         );
 
         try {
+          // Send typing indicator
+          await this.sock.sendPresenceUpdate("composing", from);
+
+          // Natural delay to give user time to read/start typing
+          await new Promise((resolve) => setTimeout(resolve, 2000));
+
           const reply = await processMessage(text, {
             channel: "whatsapp",
             from: from,
@@ -112,6 +156,8 @@ class WhatsApp {
           });
 
           if (reply) {
+            // Stop typing indicator before sending message
+            await this.sock.sendPresenceUpdate("paused", from);
             await this.sendMessage(from, reply);
           }
         } catch (err) {
@@ -154,6 +200,19 @@ class WhatsApp {
 
   async getMessages(chatId, limit = 20) {
     return []; // Baileys doesn't store messages by default without a Store
+  }
+
+  async stop() {
+    if (this.reconnectTimeout) {
+      clearTimeout(this.reconnectTimeout);
+      this.reconnectTimeout = null;
+    }
+    if (this.sock) {
+      try {
+        await this.sock.end();
+      } catch (e) {}
+      this.sock = null;
+    }
   }
 }
 

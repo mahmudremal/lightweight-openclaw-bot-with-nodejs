@@ -7,6 +7,8 @@ import Formatter from "../utils/formatter.js";
 class Telegram {
   constructor() {
     this.bot = null;
+    this.retryCount = 0;
+    this.reconnectTimeout = null;
   }
 
   async init() {
@@ -44,48 +46,104 @@ class Telegram {
 
         if (!body) return; // Ignore non-text messages for now
 
-        const isGroup = ctx.chat.type !== "private";
         const senderName =
           ctx.from.first_name || ctx.from.username || String(senderId);
+
         const isOwner =
-          tgConfig.allow_from?.includes(String(senderId)) ||
-          (username && tgConfig.allow_from?.includes(username));
+          tgConfig.human?.some(
+            (h) =>
+              h === String(senderId) ||
+              (username && h.toLowerCase() === username.toLowerCase()),
+          ) || false;
+
+        const isAllowed =
+          !tgConfig.allow_from ||
+          tgConfig.allow_from.length === 0 ||
+          tgConfig.allow_from.some(
+            (h) =>
+              h === String(senderId) ||
+              (username && h.toLowerCase() === username.toLowerCase()),
+          );
+
+        const isGroup = ctx.chat.type !== "private";
+
+        if (!isAllowed) {
+          logger.debug(
+            "TELEGRAM",
+            `Ignoring message from ${senderName} (not in allow_from)`,
+          );
+          return;
+        }
 
         logger.log(
           "TELEGRAM",
           `[TG] ${isGroup ? "[GROUP] " : ""}${from} (from: ${senderName}) -> ${body}`,
         );
 
-        const reply = await processMessage(body, {
-          channel: "telegram",
-          from: String(from),
-          senderId: String(senderId),
-          senderName,
-          isGroup,
-          isOwner,
-          ctx,
-        });
+        try {
+          // Send typing action
+          await ctx.sendChatAction("typing");
 
-        if (reply) {
-          await ctx.reply(Formatter.toTelegramHTML(reply), {
-            parse_mode: "HTML",
+          // Natural delay to give user time to read/start typing
+          await new Promise((resolve) => setTimeout(resolve, 2000));
+
+          const reply = await processMessage(body, {
+            channel: "telegram",
+            from: String(from),
+            senderId: String(senderId),
+            senderName,
+            isGroup,
+            isOwner,
+            ctx,
           });
+
+          if (reply) {
+            await ctx.reply(Formatter.toTelegramHTML(reply), {
+              parse_mode: "HTML",
+            });
+          }
+        } catch (err) {
+          logger.error("TELEGRAM", "Error handling incoming TG message:", err);
         }
       } catch (err) {
-        logger.error("TELEGRAM", "Error handling incoming TG message:", err);
+        logger.error("TELEGRAM", "Fatal error in message event:", err);
       }
     });
 
     this.bot
       .launch()
-      .then(() => logger.log("TELEGRAM", "Telegram bot started"))
-      .catch((err) =>
-        logger.error("TELEGRAM", "Failed to start Telegram bot:", err),
-      );
+      .then(() => {
+        this.retryCount = 0;
+        logger.log("TELEGRAM", "Telegram bot started");
+      })
+      .catch((err) => {
+        logger.error("TELEGRAM", "Failed to start Telegram bot:", err);
+        this.retryCount++;
+        const delays = [2000, 4000, 30000, 60000];
+        const delay = delays[Math.min(this.retryCount - 1, delays.length - 1)];
+
+        logger.info(
+          "TELEGRAM",
+          `Retrying connection in ${delay / 1000}s (Attempt ${this.retryCount})`,
+        );
+        this.bot = null;
+        if (this.reconnectTimeout) clearTimeout(this.reconnectTimeout);
+        this.reconnectTimeout = setTimeout(() => this.init(), delay);
+      });
 
     // Enable graceful stop
-    process.once("SIGINT", () => this.bot.stop("SIGINT"));
-    process.once("SIGTERM", () => this.bot.stop("SIGTERM"));
+    const stopBot = () => {
+      if (this.bot && this.bot.polling && this.bot.polling.started) {
+        try {
+          this.bot.stop("SIGINT");
+        } catch (e) {
+          // Ignore "Bot is not running" error
+        }
+      }
+      if (this.reconnectTimeout) {
+        clearTimeout(this.reconnectTimeout);
+      }
+    };
 
     return this.bot;
   }
@@ -106,6 +164,22 @@ class Telegram {
     } catch (err) {
       logger.error("TELEGRAM", "sendMessage error:", err.message);
       throw err;
+    }
+  }
+  async stop() {
+    if (this.reconnectTimeout) {
+      clearTimeout(this.reconnectTimeout);
+      this.reconnectTimeout = null;
+    }
+    if (this.bot) {
+      try {
+        if (this.bot.polling && this.bot.polling.started) {
+          await this.bot.stop();
+        }
+      } catch (err) {
+        // Ignore "already stopped"
+      }
+      this.bot = null;
     }
   }
 }

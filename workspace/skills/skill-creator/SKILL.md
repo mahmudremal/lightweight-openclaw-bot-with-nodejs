@@ -1,6 +1,6 @@
 ---
 name: skill-creator
-description: Framework for creating or updating AgentSkills. Use to structure specialized knowledge, workflows, and tools.
+description: Framework for creating or updating AgentSkills.
 metadata:
   emoji: "🐣"
 ---

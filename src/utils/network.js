@@ -16,16 +16,17 @@ class Network {
   untilOnline() {
     return new Promise((resolve) => {
       const check = async () => {
-        axios
-          .get(`${this.binEndpoint}/summary.json`)
-          .then(async () => {
+        fetch(`${this.binEndpoint}/summary.json`)
+          .then(async (res) => {
+            if (!res.ok) {
+              throw new Error("Network response was not ok");
+            }
             if (!this.online) {
               this.online = true;
               logger.info("NETWORK", "Internet connection established.");
-              await this.updatePublicIp();
             }
             events.emit("internet:online", { online: true, ip: this.ip });
-            resolve();
+            resolve(true);
           })
           .catch((error) => {
             if (this.online !== false) {
@@ -40,15 +41,10 @@ class Network {
               online: false,
               ip: this.ip,
             });
+            setTimeout(check, 1000 * 10); // Retry after 10 seconds
           });
       };
-
-      const interval = setInterval(check, 1000 * 10);
       check();
-
-      process.on("SIGINT", () => {
-        clearInterval(interval);
-      });
     });
   }
 
@@ -58,6 +54,10 @@ class Network {
       const interval = setInterval(check, 1000);
       check();
     });
+  }
+
+  isOnline() {
+    return this.online;
   }
 }
 

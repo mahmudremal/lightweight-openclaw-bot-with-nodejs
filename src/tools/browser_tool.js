@@ -1,123 +1,5 @@
-import { WebSocketServer } from "ws";
 import logger from "../utils/logger.js";
-
-class BrowserController {
-  constructor() {
-    this.wsServer = null;
-    this.connectedClients = new Set();
-    this.pendingRequests = new Map();
-    this.requestId = 0;
-  }
-
-  startServer({ server, port = 8765, path = "/ws/browser" }) {
-    if (this.wsServer) return;
-
-    if (server) {
-      this.wsServer = new WebSocketServer({ server, path });
-      logger.info(
-        "BROWSER_TOOL",
-        `WebSocket server attached to Express on ${path}`,
-      );
-    } else {
-      this.wsServer = new WebSocketServer({ port, path });
-      logger.info(
-        "BROWSER_TOOL",
-        `WebSocket server started on port ${port} at ${path}`,
-      );
-    }
-
-    this.wsServer.on("connection", (ws) => {
-      logger.info("BROWSER_TOOL", "Browser extension connected");
-      this.connectedClients.add(ws);
-
-      ws.on("message", (data) => {
-        try {
-          const response = JSON.parse(data.toString());
-          const pending = this.pendingRequests.get(response.requestId);
-          if (pending) {
-            pending.resolve(response.result);
-            this.pendingRequests.delete(response.requestId);
-          }
-        } catch (err) {
-          logger.error("BROWSER_TOOL", "Failed to parse response:", err);
-        }
-      });
-
-      ws.on("close", () => {
-        this.connectedClients.delete(ws);
-        logger.info("BROWSER_TOOL", "Browser extension disconnected");
-      });
-    });
-  }
-
-  hasConnectedClient() {
-    return this.connectedClients.size > 0;
-  }
-
-  async sendCommand(action, params = {}) {
-    if (this.connectedClients.size === 0) {
-      return { error: "No browser extension connected" };
-    }
-
-    const requestId = ++this.requestId;
-    const command = { requestId, action, params };
-
-    return new Promise((resolve) => {
-      this.pendingRequests.set(requestId, { resolve });
-
-      // Send to all connected clients (usually just one)
-      for (const client of this.connectedClients) {
-        client.send(JSON.stringify(command));
-      }
-
-      // Timeout after 30 seconds
-      setTimeout(() => {
-        if (this.pendingRequests.has(requestId)) {
-          this.pendingRequests.delete(requestId);
-          resolve({ error: "Request timeout" });
-        }
-      }, 30000);
-    });
-  }
-
-  async click(selector) {
-    return this.sendCommand("click", { selector });
-  }
-
-  async type(selector, text) {
-    return this.sendCommand("type", { selector, text });
-  }
-
-  async screenshot() {
-    return this.sendCommand("screenshot");
-  }
-
-  async getText(selector = null) {
-    return this.sendCommand("getText", { selector });
-  }
-
-  async navigate(url) {
-    return this.sendCommand("navigate", { url });
-  }
-
-  async scroll(direction = "down", amount = 300) {
-    return this.sendCommand("scroll", { direction, amount });
-  }
-
-  async hover(selector) {
-    return this.sendCommand("hover", { selector });
-  }
-
-  async waitFor(selector, timeout = 5000) {
-    return this.sendCommand("waitFor", { selector, timeout });
-  }
-
-  async evaluate(script) {
-    return this.sendCommand("evaluate", { script });
-  }
-}
-
-const browserController = new BrowserController();
+import { browserController } from "../utils/browser.js";
 
 export const browser_tool = {
   name: "browser",
@@ -131,12 +13,13 @@ export const browser_tool = {
         enum: [
           "navigate",
           "click",
-          "type",
+          "write",
           "screenshot",
           "getText",
           "scroll",
           "hover",
           "waitFor",
+          "getElements",
           "evaluate",
         ],
         description: "The browser action to perform",
@@ -152,7 +35,16 @@ export const browser_tool = {
       },
       text: {
         type: "string",
-        description: "Text to type (for type action)",
+        description: "Text to type (for write action)",
+      },
+      editor: {
+        type: "string",
+        enum: ["quill", "textarea", "input"],
+        description: "Editor type (for write action)",
+      },
+      keyPress: {
+        type: "string",
+        description: "Key and keyCode to press after typing (e.g., 'Enter,13')",
       },
       direction: {
         type: "string",
@@ -168,6 +60,16 @@ export const browser_tool = {
         description:
           "Timeout in milliseconds for waitFor action (default: 5000)",
       },
+      state: {
+        type: "string",
+        enum: ["visible", "hidden"],
+        description: "State to wait for (for waitFor action)",
+      },
+      attribute: {
+        type: "string",
+        description:
+          "Attribute to extract (for getElements action, e.g., 'src', 'href')",
+      },
       script: {
         type: "string",
         description:
@@ -180,51 +82,114 @@ export const browser_tool = {
     const { action, selector, url, text, direction, amount, timeout, script } =
       args;
 
+    // Helper to delegate to running server if local controller has no clients
+    const delegateToServer = async () => {
+      try {
+        const axios = (await import("axios")).default;
+        const response = await axios.post(
+          "http://localhost:8765/api/browsers/exec",
+          {
+            action,
+            params: args,
+          },
+        );
+        return response.data;
+      } catch (err) {
+        return null;
+      }
+    };
+
     if (!browserController.hasConnectedClient()) {
-      return "No browser extension connected. Please install and enable the Romi browser extension.";
+      const remoteResult = await delegateToServer();
+      if (remoteResult) {
+        if (remoteResult.error) return `Error: ${remoteResult.error}`;
+        if (action === "getText" && remoteResult.text) return remoteResult.text;
+        if (action === "screenshot" && remoteResult.screenshot)
+          return "Screenshot captured successfully (Base64 data removed for brevity).";
+        if (remoteResult.success)
+          return `Action '${action}' completed successfully via remote Romi server.`;
+        return JSON.stringify(remoteResult);
+      }
+      return "No browser extension connected. Please install and enable the Romi browser extension, and ensure 'romi start' is running.";
     }
 
+    let result;
     switch (action) {
       case "navigate":
         if (!url) return "Error: 'url' is required for navigate action";
-        return browserController.navigate(url);
+        result = await browserController.navigate(url);
+        break;
 
       case "click":
         if (!selector) return "Error: 'selector' is required for click action";
-        return browserController.click(selector);
+        result = await browserController.click(selector);
+        break;
 
       case "type":
         if (!selector) return "Error: 'selector' is required for type action";
         if (text === undefined)
           return "Error: 'text' is required for type action";
-        return browserController.type(selector, text);
+        result = await browserController.type(selector, text);
+        break;
+
+      case "write":
+        if (!selector) return "Error: 'selector' is required for write action";
+        if (text === undefined)
+          return "Error: 'text' is required for write action";
+        result = await browserController.sendCommand("write", args);
+        break;
 
       case "screenshot":
-        return browserController.screenshot();
+        result = await browserController.screenshot();
+        if (result.success && result.screenshot) {
+          return "Screenshot captured successfully (Base64 data removed for brevity).";
+        }
+        break;
 
       case "getText":
-        return browserController.getText(selector);
+        result = await browserController.getText(selector);
+        if (result.success && result.text) {
+          return result.text;
+        }
+        break;
 
       case "scroll":
-        return browserController.scroll(direction, amount);
+        result = await browserController.scroll(direction, amount);
+        break;
 
       case "hover":
         if (!selector) return "Error: 'selector' is required for hover action";
-        return browserController.hover(selector);
+        result = await browserController.hover(selector);
+        break;
 
       case "waitFor":
         if (!selector)
           return "Error: 'selector' is required for waitFor action";
-        return browserController.waitFor(selector, timeout);
+        result = await browserController.sendCommand("waitFor", args);
+        break;
+
+      case "getElements":
+        if (!selector)
+          return "Error: 'selector' is required for getElements action";
+        result = await browserController.sendCommand("getElements", args);
+        break;
 
       case "evaluate":
         if (!script) return "Error: 'script' is required for evaluate action";
-        return browserController.evaluate(script);
+        result = await browserController.evaluate(script);
+        break;
 
       default:
         return `Unknown action: ${action}`;
     }
+
+    if (!result) return "No result from browser.";
+    if (result.error) return `Error: ${result.error}`;
+    if (result.success) {
+      if (action === "navigate") return `Successfully navigated to ${url}`;
+      return `Action '${action}' completed successfully.`;
+    }
+
+    return JSON.stringify(result);
   },
 };
-
-export { browserController };
