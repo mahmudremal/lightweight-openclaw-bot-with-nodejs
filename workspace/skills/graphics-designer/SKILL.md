@@ -1,6 +1,6 @@
 ---
 name: graphics-designer
-description: Visual design expert. Automates image and music generation using Gemini via nanobanana script.
+description: Visual design expert. Generate image and music and video with AI.
 metadata:
   emoji: "🎨"
 ---

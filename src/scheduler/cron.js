@@ -10,10 +10,28 @@ import events from "../utils/events.js";
 class Cron {
   constructor() {
     this.tasks = new Map();
-    this.jobsFilePath = path.resolve(ROOT_DIR, "corn", "jobs.json");
-    if (!fs.existsSync(this.jobsFilePath)) {
-      this.jobsFilePath = path.resolve(ROOT_DIR, "cron", "jobs.json");
-    }
+    this.jobsFilePath = path.resolve(ROOT_DIR, "cron", "jobs.json");
+    this.writePromise = Promise.resolve();
+  }
+
+  /**
+   * Safe queued write to jobs.json to prevent race conditions
+   */
+  async _safeUpdate(updateFn) {
+    const runUpdate = async () => {
+      const data = await fs.readJson(this.jobsFilePath);
+      const result = await updateFn(data);
+      await fs.writeJson(this.jobsFilePath, data, { spaces: 2 });
+      return result;
+    };
+
+    this.writePromise = this.writePromise.then(runUpdate).catch((err) => {
+      logger.error("CRON", `Write queue error: ${err.message}`);
+      // Don't block the queue forever on error
+      return null;
+    });
+
+    return this.writePromise;
   }
 
   async init() {
@@ -51,51 +69,63 @@ class Cron {
   }
 
   scheduleJob(job) {
-    const task = node_cron.schedule(
-      job.schedule.expr,
-      async () => {
-        logger.info("CRON", `Executing job: ${job.name} (${job.id})`);
-        try {
-          if (job.payload?.kind === "agentTurn" && job.payload?.message) {
-            await processMessage(job.payload.message, {
-              channel: "cron",
-              from: "system",
-              jobId: job.id,
+    if (!job.schedule?.expr || typeof job.schedule.expr !== "string") {
+      logger.error("CRON", `Invalid cron expression for job: ${job.name}`);
+      return;
+    }
+
+    try {
+      const task = node_cron.schedule(
+        job.schedule.expr,
+        async () => {
+          logger.info("CRON", `Executing job: ${job.name} (${job.id})`);
+          try {
+            if (job.payload?.kind === "agentTurn" && job.payload?.message) {
+              await processMessage(job.payload.message, {
+                channel: "cron",
+                from: "system",
+                jobId: job.id,
+              });
+            }
+            this.updateJobState(job.id, {
+              lastStatus: "ok",
+              lastRunAtMs: Date.now(),
+            });
+          } catch (err) {
+            logger.error("CRON", `Job ${job.name} failed: ${err.message}`);
+            this.updateJobState(job.id, {
+              lastStatus: "error",
+              lastError: err.message,
+              lastRunAtMs: Date.now(),
             });
           }
-          this.updateJobState(job.id, {
-            lastStatus: "ok",
-            lastRunAtMs: Date.now(),
-          });
-        } catch (err) {
-          logger.error("CRON", `Job ${job.name} failed: ${err.message}`);
-          this.updateJobState(job.id, {
-            lastStatus: "error",
-            lastError: err.message,
-            lastRunAtMs: Date.now(),
-          });
-        }
-      },
-      {
-        scheduled: true,
-        timezone: job.schedule.tz || "UTC",
-      },
-    );
-    this.tasks.set(job.id, task);
-    logger.info("CRON", `Scheduled: '${job.name}' [${job.schedule.expr}]`);
+        },
+        {
+          scheduled: true,
+          timezone: job.schedule.tz || "UTC",
+        },
+      );
+      this.tasks.set(job.id, task);
+      logger.info("CRON", `Scheduled: '${job.name}' [${job.schedule.expr}]`);
+    } catch (err) {
+      logger.error(
+        "CRON",
+        `Failed to schedule job ${job.name}: ${err.message}`,
+      );
+    }
   }
 
   async updateJobState(jobId, stateUpdates) {
     try {
-      const data = await fs.readJson(this.jobsFilePath);
-      const jobIndex = data.jobs.findIndex((j) => j.id === jobId);
-      if (jobIndex !== -1) {
-        data.jobs[jobIndex].state = {
-          ...(data.jobs[jobIndex].state || {}),
-          ...stateUpdates,
-        };
-        await fs.writeJson(this.jobsFilePath, data, { spaces: 2 });
-      }
+      return await this._safeUpdate((data) => {
+        const jobIndex = data.jobs.findIndex((j) => j.id === jobId);
+        if (jobIndex !== -1) {
+          data.jobs[jobIndex].state = {
+            ...(data.jobs[jobIndex].state || {}),
+            ...stateUpdates,
+          };
+        }
+      });
     } catch (err) {
       logger.error("CRON", `Failed to update job state: ${err.message}`);
     }
@@ -113,7 +143,6 @@ class Cron {
   }
 
   async addJob(job) {
-    const data = await fs.readJson(this.jobsFilePath);
     const newJob = {
       id: crypto.randomUUID(),
       createdAtMs: Date.now(),
@@ -121,45 +150,54 @@ class Cron {
       enabled: true,
       ...job,
     };
-    data.jobs.push(newJob);
-    await fs.writeJson(this.jobsFilePath, data, { spaces: 2 });
+
+    await this._safeUpdate((data) => {
+      data.jobs.push(newJob);
+    });
+
     if (newJob.enabled) this.scheduleJob(newJob);
     return newJob;
   }
 
   async updateJob(jobId, updates) {
-    const data = await fs.readJson(this.jobsFilePath);
-    const jobIndex = data.jobs.findIndex((j) => j.id === jobId);
-    if (jobIndex === -1) throw new Error("Job not found");
+    const result = await this._safeUpdate((data) => {
+      const jobIndex = data.jobs.findIndex((j) => j.id === jobId);
+      if (jobIndex === -1) throw new Error("Job not found");
 
-    data.jobs[jobIndex] = {
-      ...data.jobs[jobIndex],
-      ...updates,
-      updatedAtMs: Date.now(),
-    };
-
-    await fs.writeJson(this.jobsFilePath, data, { spaces: 2 });
+      data.jobs[jobIndex] = {
+        ...data.jobs[jobIndex],
+        ...updates,
+        updatedAtMs: Date.now(),
+      };
+      return data.jobs[jobIndex];
+    });
 
     if (this.tasks.has(jobId)) {
       this.tasks.get(jobId).stop();
       this.tasks.delete(jobId);
     }
 
-    if (data.jobs[jobIndex].enabled) {
-      this.scheduleJob(data.jobs[jobIndex]);
+    if (result && result.enabled) {
+      this.scheduleJob(result);
     }
 
-    return data.jobs[jobIndex];
+    return result;
   }
 
   async deleteJob(jobId) {
-    const data = await fs.readJson(this.jobsFilePath);
-    data.jobs = data.jobs.filter((j) => j.id !== jobId);
-    await fs.writeJson(this.jobsFilePath, data, { spaces: 2 });
-    if (this.tasks.has(jobId)) {
-      this.tasks.get(jobId).stop();
-      this.tasks.delete(jobId);
+    const wasRemoved = await this._safeUpdate((data) => {
+      const originalCount = data.jobs.length;
+      data.jobs = data.jobs.filter((j) => j.id !== jobId);
+      return data.jobs.length < originalCount;
+    });
+
+    if (wasRemoved) {
+      if (this.tasks.has(jobId)) {
+        this.tasks.get(jobId).stop();
+        this.tasks.delete(jobId);
+      }
     }
+    return wasRemoved;
   }
 }
 

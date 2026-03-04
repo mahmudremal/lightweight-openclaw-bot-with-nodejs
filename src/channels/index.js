@@ -14,7 +14,8 @@ class Channels {
 
   async init() {
     // this.launchChannels();
-    events.on("internet:online", this.launchChannels);
+    events.on("internet:online", this.launchChannels.bind(this));
+    events.on("internet:offline", this.stopAll.bind(this));
 
     // events.on("config:invalidated", () => {
     //   // Maybe restart channels if config changed?

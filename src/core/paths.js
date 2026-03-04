@@ -14,13 +14,26 @@ export function getWorkspacePath(workspaceId) {
   return path.resolve(WORKSPACES_DIR, workspaceId);
 }
 
-export function rootify(path) {
-  const filePath = path.startsWith("/")
-    ? path.slice(1)
-    : path.startsWith("./")
-      ? path.slice(2)
-      : path.startsWith("~/")
-        ? path.slice(2)
-        : path;
-  return filePath;
+export function rootify(rawPath) {
+  if (!rawPath) return ".";
+
+  // 1. Normalize separators for consistency
+  let filePath = rawPath.replace(/\\/g, "/");
+
+  // 2. Remove workspace root markers (e.g. /root/, /home/, ~/, ./)
+  filePath = filePath
+    .replace(/^\/?root\//i, "")
+    .replace(/^\/?home\//i, "")
+    .replace(/^~\//, "")
+    .replace(/^\.\//, "")
+    .replace(/^\//, "");
+
+  // 3. Normalize to prevent directory traversal (e.g. removing ../)
+  // We use path.join and path.relative to ensure it's a clean relative path
+  const normalized = path.normalize(filePath).replace(/\\/g, "/");
+
+  // If it tries to go up (starts with ..), strip those parts to keep it in root
+  return normalized.startsWith("..")
+    ? normalized.replace(/^(\.\.\/)+/, "")
+    : normalized;
 }

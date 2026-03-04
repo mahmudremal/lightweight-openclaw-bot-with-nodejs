@@ -50,16 +50,23 @@ export const terminal_exec = {
     },
     required: ["command"],
   },
-  handler: async ({ command, cwd }) => {
+  handler: async ({ command, cwd }, context) => {
     const isRisky = RISKY_COMMANDS.some((risky) => command.includes(risky));
     if (isRisky) {
       return `Error: Command contains restricted/risky patterns.`;
     }
 
+    // Rootify command if it starts with /root or similar
+    const workspacePath =
+      context.workspacePath || getWorkspacePath(getActiveWorkspaceId());
+    const sanitizedCommand = command
+      .replace(/^\/?root\//i, "")
+      .replace(/^\/?home\//i, "");
+
     try {
-      logger.info("TERMINAL", `Executing: ${command}`);
-      const { stdout, stderr } = await execAsync(command, {
-        cwd: cwd || getWorkspacePath(getActiveWorkspaceId()) || process.cwd(),
+      logger.info("TERMINAL", `Executing: ${sanitizedCommand}`);
+      const { stdout, stderr } = await execAsync(sanitizedCommand, {
+        cwd: cwd ? path.resolve(workspacePath, rootify(cwd)) : workspacePath,
       });
       return stdout || stderr || "Command executed successfully (no output)";
     } catch (error) {

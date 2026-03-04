@@ -1,6 +1,6 @@
 ---
 name: article-writer
-description: High-performance SEO article writing skill. Optimized for search ranking and readability using structured workflows.
+description: High-performance SEO article writing skill using structured workflows.
 metadata:
   emoji: "✍️"
 ---

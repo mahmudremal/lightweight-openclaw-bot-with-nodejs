@@ -23,3 +23,5 @@ Information about user goes here.
 - What the user wants to learn from AI
 - Preferred interaction style
 - Areas of interest
+
+## Contact Channels

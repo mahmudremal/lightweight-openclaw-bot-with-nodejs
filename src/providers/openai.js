@@ -4,19 +4,58 @@ import logger from "../utils/logger.js";
 class OpenAIProvider {
   constructor() {}
 
-  async createChatCompletion({
+  async createChatCompletion(args) {
+    const activeConfig = await config.getActiveConfig();
+    const defaults = activeConfig.agents?.defaults || {};
+
+    // Use recursive fallback system if 'models' config exists and no explicit model is provided
+    if (defaults.models && !args.model) {
+      return this._executeWithFallback(args, defaults.models);
+    }
+
+    // Default legacy path
+    return this._executeCompletion(args);
+  }
+
+  async _executeWithFallback(args, modelConfig) {
+    try {
+      logger.debug(
+        `LLM Attempt: model=${modelConfig.model}, provider=${modelConfig.provider}`,
+      );
+      return await this._executeCompletion({
+        ...args,
+        model: modelConfig.model,
+        providerName: modelConfig.provider,
+      });
+    } catch (err) {
+      if (modelConfig.fallback) {
+        logger.warn(
+          "LLM_FALLBACK",
+          `Model ${modelConfig.model} failed. Falling back to ${modelConfig.fallback.model}. Error: ${err.message}`,
+        );
+        return this._executeWithFallback(args, modelConfig.fallback);
+      }
+      logger.error("LLM_FATAL", "All model fallbacks failed.");
+      throw err;
+    }
+  }
+
+  async _executeCompletion({
     messages,
     model = null,
     temperature = null,
     max_tokens = null,
     tools = null,
     tool_choice = null,
+    providerName = "openai",
   }) {
     const activeConfig = await config.getActiveConfig();
 
-    const API_KEY = activeConfig.providers?.openai?.api_key || "dummy";
+    // Use provider-specific settings based on modelConfig.provider
+    const API_KEY = activeConfig.providers?.[providerName]?.api_key || "dummy";
     const API_BASE_URL =
-      activeConfig.providers?.openai?.api_base || "http://localhost:11434/v1";
+      activeConfig.providers?.[providerName]?.api_base ||
+      "http://localhost:11434/v1";
 
     const defaultModel = activeConfig.agents?.defaults?.model || "qwen3:0.6b";
     const defaultTemperature =
@@ -39,26 +78,11 @@ class OpenAIProvider {
       body.tools = tools;
     }
 
-    logger.debug(
-      `LLM Request: model=${finalModel}, tokens=${finalMaxTokens}, temp=${finalTemperature}`,
-    );
-
     logger.info("LLM_REQUEST", {
+      provider: providerName,
       model: body.model,
-      messages: body.messages.map((m) => ({
-        role: m.role,
-        content: m.content
-          ? m.content.length > 500
-            ? m.content.substring(0, 500) + "..."
-            : m.content
-          : null,
-        tool_calls: m.tool_calls,
-        tool_call_id: m.tool_call_id,
-      })),
       tools_count: body.tools?.length || 0,
     });
-
-    // console.info(body.messages.find(({ role }) => role == "system").content);
 
     const resp = await fetch(`${API_BASE_URL}/chat/completions`, {
       method: "POST",
@@ -72,13 +96,20 @@ class OpenAIProvider {
 
     if (!resp.ok) {
       const text = await resp.text();
-      throw new Error(`OpenAI API error: ${resp.status} ${text}`);
+      let errorDetail = text;
+      try {
+        const json = JSON.parse(text);
+        errorDetail = json.error?.message || json.message || text;
+      } catch (e) {}
+      throw new Error(`OpenAI API error (${resp.status}): ${errorDetail}`);
     }
 
     const data = await resp.json();
     const message = data.choices?.[0]?.message;
 
-    logger.warn("LLM_RESPONSE", data);
+    if (!message) {
+      throw new Error("Invalid response from LLM (no message choice)");
+    }
 
     return message;
   }

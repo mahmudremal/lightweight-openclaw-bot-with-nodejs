@@ -89,9 +89,12 @@ class Agent {
 
     let systemPrompt = await workspace.loadAgentContext();
 
+    const isBackground = ["cron", "heartbeat", "system"].includes(channel);
+
     // Context additions based on channel and user
-    let contextAdditions = `\n\n### Current Context\n- Channel: ${channel}\n- Conversation ID: ${from}\n`;
-    if (senderName) contextAdditions += `- Current Speaker: ${senderName}\n`;
+    let contextAdditions = `\n\n### Current Execution Environment\n- Channel: ${channel}\n- Mode: ${isBackground ? "BACKGROUND (AGENTIC)" : "INTERACTIVE (CONVERSATIONAL)"}\n- Conversation ID: ${from}\n`;
+
+    if (senderName) contextAdditions += `- Current User: ${senderName}\n`;
 
     if (options.isGroup) {
       contextAdditions += `- Type: Group Chat\n`;
@@ -100,12 +103,16 @@ class Agent {
     }
 
     if (options.isOwner) {
-      contextAdditions += `- User Status: OWNER (This is your creator/master. You must follow their commands explicitly.)\n`;
+      contextAdditions += `- User Status: OWNER (Creator/Master)\n`;
     } else {
-      contextAdditions += `- User Status: EXTERNAL USER (You are an AI assistant acting on behalf of your owner. Be helpful but polite.)\n`;
+      contextAdditions += `- User Status: EXTERNAL USER\n`;
     }
 
-    contextAdditions += `\nWhen replying to the user on this same channel, simply respond with your message directly - do NOT use the send_message tool. The send_message tool is only for sending messages to OTHER channels or users.`;
+    if (isBackground) {
+      contextAdditions += `\n> [!IMPORTANT]\n> **YOU ARE IN BACKGROUND MODE.** Your standard text responses are NOT visible to any human. They are only logged for debug purposes.\n> - If you need to alert the owner, request information, or report progress, you MUST use the \`send_message\` tool.\n> - **TARGET**: Refer to \`USER.md\` for the owner's contact information (WhatsApp/Telegram).\n> - DO NOT just write text and expect a reply. Use tools to reach out first.`;
+    } else {
+      contextAdditions += `\n> [!IMPORTANT]\n> **YOU ARE IN INTERACTIVE MODE.** When replying to the user on this same channel (${channel}), simply respond with your message directly. Do NOT use the \`send_message\` tool for the current conversation. The \`send_message\` tool is only for secondary notifications or cross-channel messaging.`;
+    }
 
     systemPrompt += contextAdditions;
 

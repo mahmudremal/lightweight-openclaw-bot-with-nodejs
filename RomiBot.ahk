@@ -7,7 +7,7 @@ SetWorkingDir %A_ScriptDir%
 ; --- Configuration ---
 appName := "Romi Bot"
 serverCmd := "romi start"
-dashboardUrl := "http://localhost:8124" ; Standard dashboard URL
+dashboardUrl := "http://localhost:8765/health" ; Standard dashboard URL
 iconPath := A_ScriptDir . "\lobster.ico"
 
 if FileExist(iconPath)

@@ -45,15 +45,10 @@ export const write_file = {
   handler: async ({ path: fPath, content }, context) => {
     const filePath = rootify(fPath);
     const workspacePath = context.workspacePath;
-    const dirPaths = filePath
-      .split("/")
-      .filter((t) => t)
-      .slice(0, -1);
-    if (dirPaths?.length) {
-      fs.mkdirSync(dirPaths.join("/"));
-    }
     const fullPath = path.resolve(workspacePath, filePath);
+
     if (!fullPath.startsWith(workspacePath)) return "❌ Access denied";
+
     await fs.ensureDir(path.dirname(fullPath));
     await fs.writeFile(fullPath, content, "utf8");
     return `✅ Wrote to '${filePath}'`;
@@ -135,5 +130,101 @@ export const read_dir = {
       .map((e) => `${e.isDirectory() ? "📁" : "📄"} ${e.name}`)
       .join("\n");
     return `📁 Contents of '${dirPath}':\n${listing}`;
+  },
+};
+
+export const mkdir = {
+  name: "mkdir",
+  description:
+    "Create a directory (and parent directories if they don't exist).",
+  parameters: {
+    type: "object",
+    properties: {
+      path: {
+        type: "string",
+        description: "Path relative to the workspace root",
+      },
+    },
+    required: ["path"],
+  },
+  handler: async ({ path: fPath }, context) => {
+    const dirPath = rootify(fPath);
+    const workspacePath = context.workspacePath;
+    const fullPath = path.resolve(workspacePath, dirPath);
+    if (!fullPath.startsWith(workspacePath)) return "❌ Access denied";
+    await fs.ensureDir(fullPath);
+    return `✅ Created directory '${dirPath}'`;
+  },
+};
+
+export const move_file = {
+  name: "move_file",
+  description: "Move or rename a file or directory.",
+  parameters: {
+    type: "object",
+    properties: {
+      src: { type: "string", description: "Source path relative to workspace" },
+      dest: {
+        type: "string",
+        description: "Destination path relative to workspace",
+      },
+    },
+    required: ["src", "dest"],
+  },
+  handler: async ({ src: sPath, dest: dPath }, context) => {
+    const srcPath = rootify(sPath);
+    const destPath = rootify(dPath);
+    const workspacePath = context.workspacePath;
+    const fullSrcPath = path.resolve(workspacePath, srcPath);
+    const fullDestPath = path.resolve(workspacePath, destPath);
+
+    if (
+      !fullSrcPath.startsWith(workspacePath) ||
+      !fullDestPath.startsWith(workspacePath)
+    ) {
+      return "❌ Access denied";
+    }
+
+    if (!fs.existsSync(fullSrcPath))
+      return `❌ Source does not exist: ${srcPath}`;
+
+    await fs.move(fullSrcPath, fullDestPath, { overwrite: true });
+    return `✅ Moved '${srcPath}' to '${destPath}'`;
+  },
+};
+
+export const copy_file = {
+  name: "copy_file",
+  description: "Copy a file or directory.",
+  parameters: {
+    type: "object",
+    properties: {
+      src: { type: "string", description: "Source path relative to workspace" },
+      dest: {
+        type: "string",
+        description: "Destination path relative to workspace",
+      },
+    },
+    required: ["src", "dest"],
+  },
+  handler: async ({ src: sPath, dest: dPath }, context) => {
+    const srcPath = rootify(sPath);
+    const destPath = rootify(dPath);
+    const workspacePath = context.workspacePath;
+    const fullSrcPath = path.resolve(workspacePath, srcPath);
+    const fullDestPath = path.resolve(workspacePath, destPath);
+
+    if (
+      !fullSrcPath.startsWith(workspacePath) ||
+      !fullDestPath.startsWith(workspacePath)
+    ) {
+      return "❌ Access denied";
+    }
+
+    if (!fs.existsSync(fullSrcPath))
+      return `❌ Source does not exist: ${srcPath}`;
+
+    await fs.copy(fullSrcPath, fullDestPath);
+    return `✅ Copied '${srcPath}' to '${destPath}'`;
   },
 };

@@ -5,7 +5,7 @@ const MODE = process.argv[2];
 const PROMPT = process.argv.slice(3).join(" ");
 
 if (!MODE || !PROMPT) {
-  console.log("Usage: node nanobanana.js <image|music> <prompt>");
+  console.log("Usage: node chatgpt.js <image|music> <prompt>");
   process.exit(1);
 }
 
@@ -65,7 +65,7 @@ async function run() {
     const response = await exec(
       "create",
       {
-        url: "https://gemini.google.com/app",
+        url: "https://chatgpt.com/images",
         untilLoad: false,
         incognito: false,
       },
@@ -85,7 +85,7 @@ async function run() {
     await exec(
       "waitFor",
       {
-        selector: selector,
+        selector: "#composer-submit-button:not(:disabled)",
         state: "visible",
         timeout: 60000,
         tabId,
@@ -93,7 +93,7 @@ async function run() {
       clientId,
     );
 
-    await exec("click", { selector, tabId }, clientId);
+    await exec("click", { selector: "#prompt-textarea", tabId }, clientId);
     console.log(`⏳ Wait for 3s...`);
     await sleep(3000);
 
@@ -102,7 +102,7 @@ async function run() {
     await exec(
       "write",
       {
-        selector: ".ql-editor",
+        selector: "#prompt-textarea",
         text: `<p>${PROMPT}</p>`,
         editor: "quill",
         keyPress: "Enter,13",

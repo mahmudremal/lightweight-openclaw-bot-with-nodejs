@@ -20,31 +20,34 @@ export const add_cron_job = {
     type: "object",
     properties: {
       name: { type: "string", description: "Name of the job" },
-      schedule: {
-        type: "object",
-        properties: {
-          expr: {
-            type: "string",
-            description: "Cron expression (e.g. '0 9 * * *')",
-          },
-          tz: { type: "string", description: "Timezone (e.g. 'Asia/Dhaka')" },
-        },
-        required: ["expr"],
+      expr: {
+        type: "string",
+        description: "Cron expression (e.g. '0 9 * * *')",
+      },
+      tz: {
+        type: "string",
+        description: "Timezone (e.g. 'Asia/Dhaka')",
+        default: "Asia/Dhaka",
       },
       message: {
         type: "string",
         description: "Message to process when job runs",
       },
     },
-    required: ["name", "schedule", "message"],
+    required: ["name", "expr", "message"],
   },
-  handler: async ({ name, schedule, message }) => {
+  handler: async ({ name, expr, tz = "Asia/Dhaka", message }) => {
+    // Basic validation to prevent node-cron errors
+    if (!expr || typeof expr !== "string") {
+      return "❌ Error: 'expr' (cron expression) must be a valid string.";
+    }
+
     const job = await cron.addJob({
       name,
-      schedule: { ...schedule, kind: "cron" },
+      schedule: { expr, tz, kind: "cron" },
       payload: { kind: "agentTurn", message },
     });
-    return `Job added successfully with ID: ${job.id}`;
+    return `✅ Job added successfully with ID: ${job.id}`;
   },
 };
 
@@ -77,7 +80,7 @@ export const update_cron_job = {
       delete updates.message;
     }
     await cron.updateJob(id, updates);
-    return `Job ${id} updated successfully.`;
+    return `✅ Job ${id} updated successfully.`;
   },
 };
 
@@ -92,7 +95,10 @@ export const delete_cron_job = {
     required: ["id"],
   },
   handler: async ({ id }) => {
-    await cron.deleteJob(id);
-    return `Job ${id} deleted successfully.`;
+    const wasRemoved = await cron.deleteJob(id);
+    if (!wasRemoved) {
+      return `❌ Job ${id} not found.`;
+    }
+    return `✅ Job ${id} deleted successfully.`;
   },
 };

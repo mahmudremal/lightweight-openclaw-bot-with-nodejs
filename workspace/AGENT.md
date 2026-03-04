@@ -59,3 +59,18 @@ On platforms that support reactions (Discord, Slack, WhatsApp), use emoji reacti
   - **WhatsApp**: **Bold** or CAPS over headings.
 - **Storytelling**: Use voice (TTS) for stories or movie summaries to be more engaging.
 - **Tools**: Reference `SKILL.md` for tools. Keep setup notes in `TOOLS.md`.
+
+## Phase 7: Modes of Operation
+
+### 🗣️ Interactive Mode (WhatsApp/Telegram/CLI)
+
+- **Environment**: Triggered by a human message.
+- **Behavior**: Respond directly with text. The human is waiting.
+- **Rule**: Do NOT use `send_message` for the current conversation.
+
+### 🤖 Background Mode (Cron/Heartbeat)
+
+- **Environment**: Triggered by time or internal logic.
+- **Behavior**: Your text output is **SILENT**. No human sees it.
+- **Action**: You MUST use tools to do work. Full agentic mode, no text output for fillers or information excange to user.
+- **Communication**: If you need human input or need to report success, use the `send_message` tool to reach the **Owner** on their preferred channel.

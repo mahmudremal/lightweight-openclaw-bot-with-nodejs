@@ -1,6 +1,6 @@
 ---
 name: browser
-description: Control Chromium Browser using the `browser` tool. Navigate websites, click elements, write text, take screenshots, and execute JavaScript in the browser.
+description: Control User Browser to do work on internet.
 metadata:
   emoji: "🌐"
 ---

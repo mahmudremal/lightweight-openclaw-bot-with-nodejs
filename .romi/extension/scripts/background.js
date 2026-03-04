@@ -78,6 +78,8 @@ class RomiBrowser {
   async executeCommand(command = {}) {
     const { action, params } = command;
 
+    const { tabId = null } = params;
+
     if (action === "create") {
       let tab;
 
@@ -105,12 +107,13 @@ class RomiBrowser {
       };
     }
 
-    const [tab] = await chrome.tabs.query({
-      active: true,
-      currentWindow: true,
-    });
+    const tab = await chrome.tabs.get(tabId);
+    // chrome.tabs.query({
+    //   active: true,
+    //   currentWindow: true,
+    // });
 
-    if (!tab) return { error: "No active tab. Create one first" };
+    if (!tab) return { error: "Tab not found. Create one first" };
 
     if (action === "navigate") {
       await chrome.tabs.update(tab.id, { url: params.url });
@@ -133,14 +136,14 @@ class RomiBrowser {
     }
 
     if (action === "screenshot") {
-      const dataUrl = await chrome.tabs.captureVisibleTab(null, {
+      const dataUrl = await chrome.tabs.captureVisibleTab(tab.id, {
         format: "png",
       });
       return { success: true, screenshot: dataUrl };
     }
 
     if (action === "close") {
-      const targetTabId = params.tabId || tab?.id;
+      const targetTabId = tabId || tab?.id;
       if (targetTabId) {
         await chrome.tabs.remove(targetTabId);
         return { success: true, tabId: targetTabId };
@@ -150,7 +153,7 @@ class RomiBrowser {
 
     const results = await chrome.scripting.executeScript({
       // world: "MAIN",
-      target: { tabId: tab.id },
+      target: { tabId: tabId || tab.id },
       args: [action, params],
       func: (action, params) => {
         try {

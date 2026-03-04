@@ -16,6 +16,9 @@ import {
   append_file,
   delete_file,
   read_dir,
+  mkdir,
+  move_file,
+  copy_file,
 } from "./filesystem_tools.js";
 import {
   send_message,
@@ -40,6 +43,9 @@ const coreTools = [
   append_file,
   delete_file,
   read_dir,
+  mkdir,
+  move_file,
+  copy_file,
   send_message,
   get_chats_list,
   get_chat_messages,
