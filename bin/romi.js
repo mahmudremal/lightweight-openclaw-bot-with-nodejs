@@ -23,6 +23,11 @@ import channels from "../src/channels/index.js";
 import hlBrowser from "../src/utils/browser.js";
 import logger from "../src/utils/logger.js";
 import { initializeTools } from "../src/tools/index.js";
+import workspace, {
+  getActiveWorkspaceId,
+  getWorkspacePath,
+} from "../src/core/workspace.js";
+import skillManager from "../src/core/skillManager.js";
 
 class RomiCLI {
   constructor() {
@@ -50,44 +55,43 @@ class RomiCLI {
   }
 
   setupReadline() {
-    this.rl = readline.createInterface({
-      input: process.stdin,
-      output: process.stdout,
-      completer: this.completer.bind(this),
-    });
+    // Readline is now managed by individual commands to avoid conflicts
   }
 
-  completer(line) {
+  completer(line, callback) {
     const lastWord = line.split(/\s+/).pop();
-    if (!lastWord) return [[], line];
+    if (!lastWord) return callback(null, [[], line]);
 
-    // Skills autocomplete
-    if (lastWord.startsWith("/")) {
-      const skillsDir = path.resolve(process.cwd(), "workspace", "skills");
-      if (fs.existsSync(skillsDir)) {
-        const skills = fs
-          .readdirSync(skillsDir, { withFileTypes: true })
-          .filter((d) => d.isDirectory())
-          .map((d) => `/${d.name}`);
-        const hits = skills.filter((s) => s.startsWith(lastWord));
-        return [hits.length ? hits : skills, lastWord];
+    const workspaceId = getActiveWorkspaceId();
+    const workspacePath = getWorkspacePath(workspaceId);
+
+    // Use a self-executing async function to handle async calls
+    (async () => {
+      try {
+        // Skills autocomplete
+        if (lastWord.startsWith("/")) {
+          const skills = await skillManager.getWorkspaceSkills(workspaceId);
+          const skillNames = skills.map((s) => `/${s.name}`);
+          const hits = skillNames.filter((s) => s.startsWith(lastWord));
+          return callback(null, [hits.length ? hits : skillNames, lastWord]);
+        }
+
+        // Files autocomplete
+        if (lastWord.startsWith("@")) {
+          if (fs.existsSync(workspacePath)) {
+            const files = fs
+              .readdirSync(workspacePath, { withFileTypes: true })
+              .filter((f) => !f.isDirectory())
+              .map((f) => `@${f.name}`);
+            const hits = files.filter((f) => f.startsWith(lastWord));
+            return callback(null, [hits.length ? hits : files, lastWord]);
+          }
+        }
+        callback(null, [[], line]);
+      } catch (err) {
+        callback(null, [[], line]);
       }
-    }
-
-    // Files autocomplete
-    if (lastWord.startsWith("@")) {
-      const dir = process.cwd();
-      if (fs.existsSync(dir)) {
-        const files = fs
-          .readdirSync(dir, { withFileTypes: true })
-          .filter((f) => !f.isDirectory())
-          .map((f) => `@${f.name}`);
-        const hits = files.filter((f) => f.startsWith(lastWord));
-        return [hits.length ? hits : files, lastWord];
-      }
-    }
-
-    return [[], line];
+    })();
   }
 
   askQuestion(query) {
@@ -98,7 +102,7 @@ class RomiCLI {
     const ask = (q) => this.askQuestion(q);
 
     registerStartCommand(this.program);
-    registerChatCommands(this.program, this.rl, ask);
+    registerChatCommands(this.program, ask);
     registerSkillsCommands(this.program);
     registerChannelsCommands(this.program);
     registerBrowsersCommands(this.program);
@@ -114,7 +118,7 @@ class RomiCLI {
         await channels.stopAll();
         romiServer.stop();
         await hlBrowser.close();
-        this.rl.close();
+        if (this.rl) this.rl.close();
         process.exit(0);
       } catch (err) {
         logger.error("CLI", "Error during shutdown: " + err.message);
@@ -124,7 +128,6 @@ class RomiCLI {
 
     process.on("SIGINT", cleanup);
     process.on("SIGTERM", cleanup);
-    process.on("exit", () => this.rl.close());
   }
 
   run() {

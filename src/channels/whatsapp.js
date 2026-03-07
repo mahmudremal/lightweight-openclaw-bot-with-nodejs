@@ -10,7 +10,8 @@ import fs from "fs-extra";
 import pino from "pino";
 import { processMessage } from "../core/agent.js";
 import logger from "../utils/logger.js";
-import { ROOT_DIR } from "../core/workspace.js";
+import { ROOT_DIR, getActiveWorkspaceId } from "../core/workspace.js";
+import preprocessor from "../utils/preprocessor.js";
 import config from "../config/index.js";
 import Formatter from "../utils/formatter.js";
 
@@ -139,13 +140,16 @@ class WhatsApp {
         );
 
         try {
+          // Expansion logic
+          const expandedText = await preprocessor.expandMentions(text);
+
           // Send typing indicator
           await this.sock.sendPresenceUpdate("composing", from);
 
           // Natural delay to give user time to read/start typing
           await new Promise((resolve) => setTimeout(resolve, 2000));
 
-          const reply = await processMessage(text, {
+          const reply = await processMessage(expandedText, {
             channel: "whatsapp",
             from: from,
             senderId: sender,

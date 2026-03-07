@@ -1,7 +1,15 @@
 import { processMessage } from "../core/agent.js";
-import fs from "fs";
+import fs from "fs-extra";
 import path from "path";
 import { getActiveWorkspaceId, getWorkspacePath } from "../core/workspace.js";
+import preprocessor from "../utils/preprocessor.js";
+import inquirer from "inquirer";
+import autocomplete from "inquirer-autocomplete-prompt";
+import chalk from "chalk";
+import fuzzy from "fuzzy";
+import skillManager from "../core/skillManager.js";
+
+inquirer.registerPrompt("autocomplete", autocomplete);
 
 class Terminal {
   constructor() {
@@ -9,49 +17,7 @@ class Terminal {
   }
 
   async preProcessInput(text) {
-    const fileMatches = text.match(/@(\S+)/g) || [];
-    const skillMatches = text.match(/\/(\S+)/g) || [];
-
-    let expandedText = text;
-
-    for (const match of fileMatches) {
-      const fileName = path.resolve(
-        getWorkspacePath(getActiveWorkspaceId()),
-        match.slice(1),
-      );
-      try {
-        if (fs.existsSync(fileName)) {
-          const content = fs.readFileSync(fileName, "utf8");
-          expandedText = expandedText.replace(
-            match,
-            `[File: ${fileName}]\n${content}\n`,
-          );
-        }
-      } catch (e) {}
-    }
-
-    for (const match of skillMatches) {
-      const skillName = match.slice(1);
-      if (this.EXIT_COMMANDS.has(match.toLowerCase())) continue;
-
-      try {
-        const skillPath = path.resolve(
-          getWorkspacePath(getActiveWorkspaceId()),
-          "skills",
-          skillName,
-          "SKILL.md",
-        );
-        if (fs.existsSync(skillPath)) {
-          const content = fs.readFileSync(skillPath, "utf8");
-          expandedText = expandedText.replace(
-            match,
-            `\n\n[Skill: ${skillName}]\n${content}\n\n`,
-          );
-        }
-      } catch (e) {}
-    }
-
-    return expandedText;
+    return preprocessor.expandMentions(text);
   }
 
   formatMarkdown(text) {
@@ -59,58 +25,138 @@ class Terminal {
 
     let formatted = text;
 
-    // Bold
-    formatted = formatted.replace(/\*\*(.*?)\*\*/g, "\x1b[1m$1\x1b[22m");
+    // Bold - Cyan
+    formatted = formatted.replace(/\*\*(.*?)\*\*/g, chalk.bold.cyan("$1"));
 
-    // Italic
-    formatted = formatted.replace(/\*(.*?)\*/g, "\x1b[3m$1\x1b[23m");
+    // Italic - Magenta
+    formatted = formatted.replace(/\*(.*?)\*/g, chalk.italic.magenta("$1"));
 
-    // Inline code
-    formatted = formatted.replace(/`(.*?)`/g, "\x1b[47m\x1b[30m $1 \x1b[0m");
+    // Inline code - Gray background
+    formatted = formatted.replace(/`(.*?)`/g, chalk.bgGray.white(" $1 "));
 
-    // Code blocks
+    // Code blocks - Glassmorphism style border
     formatted = formatted.replace(
       /```(\w+)?\n([\s\S]*?)```/g,
       (match, lang, code) => {
-        const border = "─".repeat(Math.min(process.stdout.columns || 40, 60));
-        return `\n\x1b[90m┌${border}┐\x1b[0m\n\x1b[32m${code.trim()}\x1b[0m\n\x1b[90m└${border}┘\x1b[0m\n`;
+        const border = chalk
+          .dim("─")
+          .repeat(Math.min(process.stdout.columns || 40, 60));
+        return `\n${chalk.blue("┌")}${border}${chalk.blue("┐")}\n${chalk.green(code.trim())}\n${chalk.blue("└")}${border}${chalk.blue("┘")}\n`;
       },
     );
 
-    // Headings
-    formatted = formatted.replace(/^# (.*$)/gm, "\x1b[1;35m$1\x1b[0m");
-    formatted = formatted.replace(/^## (.*$)/gm, "\x1b[1;34m$1\x1b[0m");
-    formatted = formatted.replace(/^### (.*$)/gm, "\x1b[1;36m$1\x1b[0m");
+    // Headings - Gradient like colors
+    formatted = formatted.replace(/^# (.*$)/gm, chalk.bold.magentaBright("$1"));
+    formatted = formatted.replace(/^## (.*$)/gm, chalk.bold.blueBright("$1"));
+    formatted = formatted.replace(/^### (.*$)/gm, chalk.bold.cyanBright("$1"));
 
     // Lists
-    formatted = formatted.replace(/^\s*[-*]\s+(.*$)/gm, " • \x1b[37m$1\x1b[0m");
+    formatted = formatted.replace(
+      /^\s*[-*]\s+(.*$)/gm,
+      ` ${chalk.yellow("•")} $1`,
+    );
 
     return formatted;
   }
 
-  startChat(rl) {
-    console.log("\n🐪 Romi — Interactive Chat");
-    console.log("Type your message. Type 'exit' to quit.");
-    console.log(
-      "Use @filename to include file, /skillname to include skill.\n",
+  async startChat(oldRl) {
+    // If there's an old readline passed in, we must close it to free stdin
+    if (oldRl && typeof oldRl.close === "function") {
+      try {
+        oldRl.close();
+      } catch (e) {}
+    }
+
+    process.stdout.write(
+      `\n${chalk.bold.cyan("🐪 Romi")} — ${chalk.dim("Interactive Chat")}\n`,
+    );
+    process.stdout.write(
+      `${chalk.dim("Workspace:")} ${chalk.magenta(getActiveWorkspaceId())}\n`,
+    );
+    process.stdout.write(
+      `${chalk.dim("Commands :")} ${chalk.yellow("/")}skills, ${chalk.yellow("@")}files, ${chalk.red("exit")}\n\n`,
     );
 
-    const prompt = () => {
-      rl.question("\x1b[36mYou:\x1b[0m ", async (input) => {
-        const text = input.trim();
-        if (!text) return prompt();
+    const workspaceId = getActiveWorkspaceId();
+    const workspacePath = getWorkspacePath(workspaceId);
+
+    // Explicit exit handler for terminal stability
+    const exitHandler = () => {
+      console.log(chalk.red("\nGoodbye!"));
+      process.exit(0);
+    };
+
+    process.once("SIGINT", exitHandler);
+
+    while (true) {
+      try {
+        const { message } = await inquirer.prompt([
+          {
+            type: "autocomplete",
+            name: "message",
+            message: chalk.cyan("You:"),
+            prefix: "",
+            suffix: "",
+            pageSize: 8,
+            suggestOnly: true,
+            searchText: chalk.dim("Searching..."),
+            emptyText: chalk.dim(""),
+            source: async (answers, input) => {
+              const currentInput = input || "";
+              const words = currentInput.split(/\s+/);
+              const lastWord = words[words.length - 1] || "";
+
+              if (lastWord.startsWith("@")) {
+                const search = lastWord.slice(1);
+                if (!fs.existsSync(workspacePath)) return [];
+                const files = fs
+                  .readdirSync(workspacePath, { withFileTypes: true })
+                  .filter((f) => !f.isDirectory())
+                  .map((f) => f.name);
+
+                const matches = fuzzy
+                  .filter(search, files)
+                  .map((m) => m.string);
+                const prefix = currentInput.substring(
+                  0,
+                  currentInput.lastIndexOf("@") + 1,
+                );
+                return matches.map((m) => prefix + m);
+              }
+
+              if (lastWord.startsWith("/")) {
+                const search = lastWord.slice(1);
+                const skills =
+                  await skillManager.getWorkspaceSkills(workspaceId);
+                const skillNames = skills.map((s) => s.name);
+
+                const matches = fuzzy
+                  .filter(search, skillNames)
+                  .map((m) => m.string);
+                const prefix = currentInput.substring(
+                  0,
+                  currentInput.lastIndexOf("/") + 1,
+                );
+                return matches.map((m) => prefix + m);
+              }
+
+              return [];
+            },
+          },
+        ]);
+
+        const text = message?.trim();
+        if (!text) continue;
 
         if (this.EXIT_COMMANDS.has(text.toLowerCase())) {
-          console.log("\nGoodbye!");
-          rl.close();
-          process.exit(0);
-          return;
+          exitHandler();
+          break;
         }
 
         const expandedText = await this.preProcessInput(text);
 
         try {
-          process.stdout.write("\x1b[90mThinking...\x1b[0m\r");
+          process.stdout.write(chalk.dim("Thinking..."));
           const reply = await processMessage(expandedText, {
             channel: "cli",
             from: "cli:user",
@@ -118,29 +164,35 @@ class Terminal {
             onEvent: (event) => {
               if (event.type === "tool_start") {
                 event.toolCalls.forEach((call) => {
-                  console.log(
-                    `\x1b[90m[Tool] Calling ${call.tool}(${JSON.stringify(call.args)})\x1b[0m`,
+                  process.stdout.write(
+                    `\r\x1b[K${chalk.cyan(" • ")}${chalk.dim("Invoking tool:")} ${chalk.bold.blue(call.tool)}...  \n`,
                   );
+                  process.stdout.write(chalk.dim("Thinking..."));
                 });
-              } else if (event.type === "tool_end") {
-                console.log(
-                  `\x1b[90m[Tool] ${event.tool} result: ${String(event.result).substring(0, 100)}${String(event.result).length > 100 ? "..." : ""}\x1b[0m`,
-                );
               }
             },
           });
+          process.stdout.write("\r\x1b[K"); // Clear Thinking...
           console.log(
-            `\r\x1b[K\n\x1b[33mRomi:\x1b[0m\n${this.formatMarkdown(reply)}\n`,
+            `${chalk.bold.yellow("Romi:")}\n${this.formatMarkdown(reply)}\n`,
           );
         } catch (err) {
-          console.error(`\x1b[31mError:\x1b[0m ${err.message}\n`);
+          process.stdout.write("\r\x1b[K");
+          console.error(`${chalk.red.bold("Error:")} ${err.message}\n`);
         }
+      } catch (err) {
+        if (
+          err.message.includes("force closed") ||
+          err.message.includes("interrupted")
+        )
+          break;
+        console.error(chalk.red("\nTerminal Session Error:"), err.message);
+        break;
+      }
+    }
 
-        prompt();
-      });
-    };
-
-    prompt();
+    process.removeListener("SIGINT", exitHandler);
+    process.exit(0);
   }
 }
 

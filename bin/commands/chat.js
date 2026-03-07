@@ -3,7 +3,7 @@ import { resolveWorkspace } from "../../src/core/workspace.js";
 import logger from "../../src/utils/logger.js";
 import { processMessage } from "../../src/core/agent.js";
 
-export function registerChatCommands(program, rl, askQuestion) {
+export function registerChatCommands(program, askQuestion) {
   program
     .command("chat")
     .description("Interactive terminal chat with Romi")
@@ -11,7 +11,7 @@ export function registerChatCommands(program, rl, askQuestion) {
     .action(async (opts) => {
       const workspaceName = await resolveWorkspace(opts.workspace, askQuestion);
       logger.info("ROMI", `Chatting in workspace: '${workspaceName}'`);
-      startChat(rl);
+      startChat();
     });
 
   program

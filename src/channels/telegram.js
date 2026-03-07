@@ -3,6 +3,11 @@ import config from "../config/index.js";
 import logger from "../utils/logger.js";
 import { processMessage } from "../core/agent.js";
 import Formatter from "../utils/formatter.js";
+import fs from "fs-extra";
+import path from "path";
+import skillManager from "../core/skillManager.js";
+import { getWorkspacePath, getActiveWorkspaceId } from "../core/workspace.js";
+import preprocessor from "../utils/preprocessor.js";
 
 class Telegram {
   constructor() {
@@ -34,7 +39,14 @@ class Telegram {
         "TELEGRAM",
         `New user started bot: ${ctx.from.username || ctx.from.id}`,
       );
-      ctx.reply("Romi is here. How can I help you today?");
+      ctx.reply("Romi is here. How can I help you today?", {
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: "📜 List Skills", callback_data: "list_skills" }],
+            [{ text: "📁 List Files", callback_data: "list_files" }],
+          ],
+        },
+      });
     });
 
     this.bot.on("message", async (ctx) => {
@@ -81,13 +93,16 @@ class Telegram {
         );
 
         try {
+          // Expansion logic (similar to terminal)
+          const expandedBody = await this.preProcessInput(body);
+
           // Send typing action
           await ctx.sendChatAction("typing");
 
           // Natural delay to give user time to read/start typing
           await new Promise((resolve) => setTimeout(resolve, 2000));
 
-          const reply = await processMessage(body, {
+          const reply = await processMessage(expandedBody, {
             channel: "telegram",
             from: String(from),
             senderId: String(senderId),
@@ -110,11 +125,16 @@ class Telegram {
       }
     });
 
+    this.setupHandlers();
+
     this.bot
       .launch()
-      .then(() => {
+      .then(async () => {
         this.retryCount = 0;
         logger.log("TELEGRAM", "Telegram bot started");
+        await this.updateCommands().catch((err) =>
+          logger.error("TELEGRAM", "Error setting commands:", err),
+        );
       })
       .catch((err) => {
         logger.error("TELEGRAM", "Failed to start Telegram bot:", err);
@@ -166,6 +186,150 @@ class Telegram {
       throw err;
     }
   }
+  async preProcessInput(text) {
+    return preprocessor.expandMentions(text);
+  }
+
+  setupHandlers() {
+    // Inline query handler for autocompletion (triggered by @botname)
+    this.bot.on("inline_query", async (ctx) => {
+      const query = ctx.inlineQuery.query;
+      const workspaceId = getActiveWorkspaceId();
+      const workspacePath = getWorkspacePath(workspaceId);
+      const results = [];
+
+      try {
+        // Skills
+        const skills = await skillManager.getWorkspaceSkills(workspaceId);
+        skills.forEach((s) => {
+          if (!query || s.name.toLowerCase().includes(query.toLowerCase())) {
+            results.push({
+              type: "article",
+              id: `skill:${s.name}`,
+              title: `Skill: /${s.name}`,
+              description: s.description || "Run this skill",
+              input_message_content: { message_text: `/${s.name}` },
+            });
+          }
+        });
+
+        // Files
+        if (fs.existsSync(workspacePath)) {
+          const files = fs
+            .readdirSync(workspacePath)
+            .filter((f) => fs.statSync(path.join(workspacePath, f)).isFile());
+          files.forEach((f) => {
+            if (!query || f.toLowerCase().includes(query.toLowerCase())) {
+              results.push({
+                type: "article",
+                id: `file:${f}`,
+                title: `File: @${f}`,
+                description: `Include content of ${f}`,
+                input_message_content: { message_text: `@${f}` },
+              });
+            }
+          });
+        }
+
+        await ctx.answerInlineQuery(results.slice(0, 50));
+      } catch (err) {
+        logger.error("TELEGRAM", "Inline query error:", err);
+      }
+    });
+
+    // Callback query handler
+    this.bot.on("callback_query", async (ctx) => {
+      const data = ctx.callbackQuery.data;
+      const workspaceId = getActiveWorkspaceId();
+
+      if (data === "list_skills") {
+        const skills = await skillManager.getWorkspaceSkills(workspaceId);
+        if (skills.length === 0) {
+          return ctx.answerCbQuery("No skills installed.");
+        }
+        const buttons = skills.map((s) => [
+          { text: `/${s.name}`, callback_data: `run_skill:${s.name}` },
+        ]);
+        await ctx.editMessageText("Available Skills:", {
+          reply_markup: { inline_keyboard: buttons },
+        });
+      } else if (data === "list_files") {
+        const workspacePath = getWorkspacePath(workspaceId);
+        if (fs.existsSync(workspacePath)) {
+          const files = fs
+            .readdirSync(workspacePath)
+            .filter((f) => fs.statSync(path.join(workspacePath, f)).isFile());
+          if (files.length === 0) {
+            return ctx.answerCbQuery("No files in workspace.");
+          }
+          const buttons = files
+            .slice(0, 50)
+            .map((f) => [
+              { text: `@${f}`, callback_data: `mention_file:${f}` },
+            ]);
+          await ctx.editMessageText("Workspace Files:", {
+            reply_markup: { inline_keyboard: buttons },
+          });
+        }
+      } else if (data.startsWith("run_skill:")) {
+        const skill = data.split(":")[1];
+        await ctx.answerCbQuery(`Use /${skill} to run this skill.`);
+        await ctx.reply(`/${skill}`);
+      } else if (data.startsWith("mention_file:")) {
+        const file = data.split(":")[1];
+        await ctx.answerCbQuery(`Mentioned @${file}`);
+        await ctx.reply(`@${file}`);
+      }
+    });
+
+    // Explicit command handlers for skills
+    this.bot.command("skills", async (ctx) => {
+      const workspaceId = getActiveWorkspaceId();
+      const skills = await skillManager.getWorkspaceSkills(workspaceId);
+      const text = skills
+        .map((s) => `/${s.name} - ${s.description}`)
+        .join("\n");
+      await ctx.reply(text || "No skills found.");
+    });
+
+    this.bot.command("files", async (ctx) => {
+      const workspaceId = getActiveWorkspaceId();
+      const workspacePath = getWorkspacePath(workspaceId);
+      if (fs.existsSync(workspacePath)) {
+        const files = fs
+          .readdirSync(workspacePath)
+          .filter((f) => fs.statSync(path.join(workspacePath, f)).isFile());
+        const text = files.map((f) => `@${f}`).join("\n");
+        await ctx.reply(text || "No files found.");
+      }
+    });
+  }
+
+  async updateCommands() {
+    if (!this.bot) return;
+    try {
+      const workspaceId = getActiveWorkspaceId();
+      const skills = await skillManager.getWorkspaceSkills(workspaceId);
+      const commands = skills.map((s) => ({
+        command: s.name.toLowerCase().replace(/[^a-z0-9_]/g, "_"), // TG rules
+        description: s.description.substring(0, 100) || `Run skill ${s.name}`,
+      }));
+
+      // Add default commands
+      if (commands.length < 100) {
+        commands.push({ command: "start", description: "Start the bot" });
+      }
+
+      await this.bot.telegram.setMyCommands(commands.slice(0, 100));
+      logger.log(
+        "TELEGRAM",
+        `Registered ${commands.length} skills as commands`,
+      );
+    } catch (err) {
+      logger.error("TELEGRAM", "Failed to update bot commands:", err.message);
+    }
+  }
+
   async stop() {
     if (this.reconnectTimeout) {
       clearTimeout(this.reconnectTimeout);
