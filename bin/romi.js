@@ -28,6 +28,7 @@ import workspace, {
   getWorkspacePath,
 } from "../src/core/workspace.js";
 import skillManager from "../src/core/skillManager.js";
+import { delete_cron_job } from "../src/tools/cron_tools.js";
 
 class RomiCLI {
   constructor() {
@@ -100,6 +101,15 @@ class RomiCLI {
 
   registerCommands() {
     const ask = (q) => this.askQuestion(q);
+
+    this.program
+      .command("test")
+      .description("Test any function")
+      .action(async (opts) => {
+        delete_cron_job
+          .handler({ id: "7d646250-15ff-41bc-b6fd-a9bae6695dd7" })
+          .finally(() => process.exit(0));
+      });
 
     registerStartCommand(this.program);
     registerChatCommands(this.program, ask);

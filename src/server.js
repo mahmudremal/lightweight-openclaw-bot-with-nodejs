@@ -4,6 +4,7 @@ import { processMessage } from "./core/agent.js";
 import logger from "./utils/logger.js";
 import { browserController } from "./utils/browser.js";
 import network from "./utils/network.js";
+import events from "./utils/events.js";
 
 class RomiServer {
   constructor() {
@@ -68,6 +69,7 @@ class RomiServer {
           server: this.server,
           path: "/ws/browser",
         });
+        events.emit("server:initiated", this.app);
         resolve(this.server);
       });
     });

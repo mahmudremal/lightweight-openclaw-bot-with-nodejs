@@ -1,3 +1,4 @@
-# Keep this file empty (or with only comments) to skip heartbeat API calls.
+# Heartbeat
 
-# Add tasks below when you want the agent to check something periodically.
+# Keep empty for no background API checks.
+# Add tasks below for periodic checks.

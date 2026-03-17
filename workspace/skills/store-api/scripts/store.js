@@ -1,7 +1,13 @@
+import https from "https";
+
 const BASE_URL = "https://urmoonlitmeadow.uxndev.com/wp-json/store/agent";
 
 const args = process.argv.slice(2);
 const command = args[0];
+
+const agent = new https.Agent({
+  rejectUnauthorized: false,
+});
 
 const getArg = (key) => {
   const arg = args.find((a) => a.startsWith(key));
@@ -47,7 +53,11 @@ const run = async () => {
           params.append(k, v);
         }
       });
-      const res = await fetch(`${BASE_URL}/${endpoint}?${params}`);
+      const res = await fetch(`${BASE_URL}/${endpoint}?${params}`, {
+        // agent,
+        // dispatcher: agent,
+        rejectUnauthorized: false,
+      });
       display(await res.json());
     } else if (command === "update" && args[1] === "order") {
       const id = args[2];
@@ -57,6 +67,9 @@ const run = async () => {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: dataStr,
+        // agent,
+        // dispatcher: agent,
+        rejectUnauthorized: false,
       });
       console.log(`\n\x1b[1mUpdate Status: ${res.status}\x1b[0m`);
       display(await res.json());

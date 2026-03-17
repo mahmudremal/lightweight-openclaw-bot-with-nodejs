@@ -1,10 +1,6 @@
-Your Human
-
-<!-- PRESERVE THIS STRUCTURE: Only update the sections below. DO NOT delete existing content or headers. -->
-
 # User
 
-Information about user goes here.
+Information about your human goes here.
 
 ## Preferences
 

@@ -49,6 +49,9 @@
     }
   },
   "channels": {
+    "web": {
+      "enabled": true
+    },
     "whatsapp": {
       "enabled": true,
       "provider": "whatsapp-web.js",

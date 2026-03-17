@@ -163,6 +163,8 @@ class Terminal {
             isOwner: true,
             onEvent: (event) => {
               if (event.type === "tool_start") {
+                // here i think i should also be able to see what's going on like a trimmed like thing like which tool is calling is showing but not showing argulements and their values (trimmed).
+                // so there should be a thing like i can be able to toggle detail view of funciton calling and minimized view like how it is now.so how can i open detail view? a nice way would be like `CTRL + e`, it will toggle (on/off) tool view mode, on on tools will show on card view where i'll be able to see detailed tools those are calling/called with arguments (a max length then trimmed). so again ctrl +e will turn off detailed mode and it will show minimal view of tools. right?
                 event.toolCalls.forEach((call) => {
                   process.stdout.write(
                     `\r\x1b[K${chalk.cyan(" • ")}${chalk.dim("Invoking tool:")} ${chalk.bold.blue(call.tool)}...  \n`,

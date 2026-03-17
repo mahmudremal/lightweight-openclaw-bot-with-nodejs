@@ -10,7 +10,7 @@ FileEncoding, UTF-8
 ; --- Configuration ---
 appName := "Romi Bot"
 serverCmd := "romi start"
-dashboardUrl := "http://localhost:8765/health"
+dashboardUrl := "http://localhost:8765/dashboard"
 iconPath := A_ScriptDir . "\\lobster.ico"
 
 if FileExist(iconPath)

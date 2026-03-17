@@ -7,19 +7,23 @@ metadata:
 
 # Graphics Designer Skill
 
-I handle visual content creation by automating the browser.
+I handle visual content creation by proper prompting.
 
 ## Workflow
 
 To generate images or music, use the `terminal_exec` tool (or `spawn_subagent`) to run the `nanobanana` script.
 
+### Command line
+
+`node scripts/nanobanana.js image|music ....prompt`
+
 ### 🖼️ Generate Image
 
-`node scripts/nanobanana.js image "A futuristic city with neon lights"`
+`node scripts/nanobanana.js image A futuristic city with neon lights`
 
 ### 🎵 Generate Music
 
-`node scripts/nanobanana.js music "Melodic lofi hip-hop beat"`
+`node scripts/nanobanana.js music Melodic lofi hip-hop beat`
 
 ## Capabilities
 

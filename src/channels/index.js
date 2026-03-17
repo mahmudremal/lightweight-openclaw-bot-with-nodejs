@@ -2,6 +2,7 @@ import config from "../config/index.js";
 import logger from "../utils/logger.js";
 import whatsapp from "./whatsapp.js";
 import telegram from "./telegram.js";
+import web from "./web.js";
 import events from "../utils/events.js";
 
 class Channels {
@@ -9,6 +10,7 @@ class Channels {
     this.channels = {
       whatsapp,
       telegram,
+      web,
     };
   }
 
