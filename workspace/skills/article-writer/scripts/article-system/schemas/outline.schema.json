@@ -1,0 +1,29 @@
+{
+  "type": "object",
+  "properties": {
+    "sections": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "title": { "type": "string" },
+          "goal": { "type": "string" },
+          "angle": { "type": "string" },
+          "wordTarget": { "type": "string" },
+          "contentType": { "type": "string" },
+          "requiredElements": { "type": "array", "items": { "type": "string" } },
+          "mediaPlan": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": { "type": { "type": "string" }, "placement": { "type": "string" }, "purpose": { "type": "string" } }
+            }
+          }
+        },
+        "required": ["title", "goal", "requiredElements"]
+      }
+    }
+  },
+  "required": ["sections"]
+}

@@ -16,21 +16,59 @@ class Agent {
     this.conversationHistory = new Map();
     this.MAX_HISTORY = 20;
     this.DEFAULT_MAX_ITERATIONS = 10;
+    this.MAX_CONTENT_LENGTH = 200;
+  }
+
+  _getSessionFilePath(sessionKey) {
+    const safeKey = sessionKey.replace(/[^a-z0-9_-]/gi, "_");
+    return `memory/sessions/${safeKey}.json`;
+  }
+
+  _trimMessage(message) {
+    if (!message.content || typeof message.content !== "string") return message;
+    if (message.content.length > this.MAX_CONTENT_LENGTH) {
+      message.content =
+        message.content.substring(0, this.MAX_CONTENT_LENGTH) + "...";
+    }
+    return message;
   }
 
   getHistory(sessionKey) {
     if (!this.conversationHistory.has(sessionKey)) {
-      this.conversationHistory.set(sessionKey, []);
+      try {
+        const filePath = this._getSessionFilePath(sessionKey);
+        const data = workspace.readWorkspaceFile(filePath);
+        if (data) {
+          this.conversationHistory.set(sessionKey, JSON.parse(data));
+        } else {
+          this.conversationHistory.set(sessionKey, []);
+        }
+      } catch (err) {
+        logger.error("AGENT", `Error loading history for ${sessionKey}:`, err);
+        this.conversationHistory.set(sessionKey, []);
+      }
     }
     return this.conversationHistory.get(sessionKey);
   }
 
+  saveHistory(sessionKey) {
+    try {
+      const history = this.getHistory(sessionKey);
+      const filePath = this._getSessionFilePath(sessionKey);
+      workspace.writeWorkspaceFile(filePath, JSON.stringify(history, null, 2));
+    } catch (err) {
+      logger.error("AGENT", `Error saving history for ${sessionKey}:`, err);
+    }
+  }
+
   addToHistory(sessionKey, message) {
     const history = this.getHistory(sessionKey);
-    history.push(message);
+    const trimmed = this._trimMessage({ ...message });
+    history.push(trimmed);
     if (history.length > this.MAX_HISTORY) {
       history.splice(0, history.length - this.MAX_HISTORY);
     }
+    this.saveHistory(sessionKey);
   }
 
   parseToolCalls(response) {
@@ -81,8 +119,10 @@ class Agent {
   async processMessage(text, options = {}) {
     const { channel = "cli", from = "user", senderName, onEvent } = options;
     const timestamp = new Date().toISOString();
+    const timeStr = new Date().toLocaleTimeString();
     const sessionKey = `${channel}:${from}`;
-    const logText = senderName ? `${senderName}: ${text}` : text;
+    const logText = `${senderName || "user"}: ${text}`;
+    
     appendHistory(
       `[${timestamp}] [${channel}] ${from} (${senderName || "user"}): ${text}`,
     );
@@ -92,7 +132,7 @@ class Agent {
     const isBackground = ["cron", "heartbeat", "system"].includes(channel);
 
     // Context additions based on channel and user
-    let contextAdditions = `\n\n### Current Execution Environment\n- Channel: ${channel}\n- Mode: ${isBackground ? "BACKGROUND (AGENTIC)" : "INTERACTIVE (CONVERSATIONAL)"}\n- Conversation ID: ${from}\n`;
+    let contextAdditions = `\n\n### Current Execution Environment\n- Channel: ${channel}\n- Mode: ${isBackground ? "BACKGROUND (AGENTIC)" : "INTERACTIVE (CONVERSATIONAL)"}\n- Conversation ID: ${from}\n- Current Time: ${new Date().toLocaleString()}\n`;
 
     if (senderName) contextAdditions += `- Current User: ${senderName}\n`;
 
@@ -116,7 +156,10 @@ class Agent {
 
     systemPrompt += contextAdditions;
 
-    this.addToHistory(sessionKey, { role: "user", content: logText });
+    this.addToHistory(sessionKey, { 
+      role: "user", 
+      content: `[${timeStr}] ${logText}` 
+    });
 
     const tools = getToolsSchema();
     const maxIterations = await getMaxToolIterations().catch(
@@ -139,7 +182,13 @@ class Agent {
       const response = await openaiCreateChatCompletion({ messages, tools });
       if (!response) break;
 
-      this.addToHistory(sessionKey, response);
+      // Add timestamp to assistant response for history
+      const assistantMsg = { ...response };
+      if (assistantMsg.content) {
+        assistantMsg.content = `[${new Date().toLocaleTimeString()}] ${assistantMsg.content}`;
+      }
+      this.addToHistory(sessionKey, assistantMsg);
+      
       if (response.content) {
         lastContent = response.content;
       }
@@ -185,6 +234,9 @@ class Agent {
               ? r.result
               : JSON.stringify(r.result, null, 2),
         };
+        // Add timestamp to tool result content
+        toolMsg.content = `[${new Date().toLocaleTimeString()}] Result from ${r.tool}: ${toolMsg.content}`;
+        
         this.addToHistory(sessionKey, toolMsg);
         turnToolsResult.push(toolMsg);
       }

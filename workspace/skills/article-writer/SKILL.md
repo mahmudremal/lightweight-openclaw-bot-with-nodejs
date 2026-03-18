@@ -1,52 +1,52 @@
 ---
 name: article-writer
-description: High-performance SEO article writing skill using structured workflows.
+description: High-performance, multi-agent SEO article generation system.
 metadata:
   emoji: "✍️"
 ---
 
-# Article Writer Skill
+# ✍️ Article Writer Skill
 
-I produce high-ranking content using a structured, asset-rich workflow. Every article I create follows a strict organizational pattern to ensure all research and assets are preserved.
+I am a high-performance content generation system that uses a multi-agent pipeline (Planner, Researcher, Writer, Editor, Critic, and Graphics Designer) to produce editorial-grade, SEO-optimized articles.
 
-## 📁 Workspace Structure
+## 🚀 One-Command Generation
 
-For every new article, I create a dedicated directory:
-`articles/[article-slug]/`
+I automate the entire research, planning, writing, and asset generation process. You only need to provide a **specific and detailed topic**.
 
-Inside this directory, I organize everything:
+### 🛠️ Execution
 
-- `planning.md` - Keywords, search intent, and structural blueprint.
-- `drafts/` - Individual sections and parts of the article.
-- `assets/` - Generated images (🎨), music (🎧), or videos.
-- `index.md` - The final, polished, and full article.
+Run the following command from the project root to generate a complete article:
 
-## 🚀 Workflow Phases
+```bash
+node scripts/article.js "Your Specific and Information-Rich Topic"
+```
 
-### Phase 1: Deep Research
+## 🧠 Strategic Guidelines
 
-- Create the article directory matching the slug.
-- Use the **keyword-planner** skill to identify **Main Keywords**, **LSI keywords**, and **User Intent**.
-- Document the blueprint in `planning.md`.
+### 1. Topic Specificity (Critical)
 
-### Phase 2: Asset Procurement
+For the best results, provide a topic that is:
 
-- Use the **graphics-designer** skill to generate high-quality visual and audio assets.
-- Store all generated media in the `assets/` folder within the article directory.
+- **Specific:** Avoid broad terms like "Figma." Instead, use "How Figma's 2024 UI Update Revolutionized Collaborative Design Systems."
+- **Detailed:** Include specific angles or constraints (e.g., "for enterprise teams," "on a budget," "comparative analysis").
+- **Information-Rich:** Mention specific technologies, trends, or data points you want the research agent to prioritize.
 
-### Phase 3: Structured Drafting
+### 2. Multi-Agent Pipeline Flow
 
-- Write the article in modular parts (Intro, Body Sections, FAQ, CTA) inside `drafts/`.
-- Maintain SEO excellence:
-  - **H1 Header**: Catchy, contains Main Keyword.
-  - **H2/H3 Layout**: Answer "People Also Ask" questions.
-  - **Readability**: Max 3 sentences per paragraph, use lists and bolding.
+My internal process follows a strict 7-layer architecture:
 
-### Phase 4: Final Assembly & Optimization
+- **SERP Intelligence:** Analyzes top-ranking content for gaps and patterns.
+- **Keyword Scoring:** Identifies primary and secondary keywords based on intent and difficulty.
+- **Blueprint & Outline:** Establishes a narrative style and differentiation strategy.
+- **Block-Based Writing:** Generates content in logical blocks (hooks, paragraphs, examples).
+- **Critic Loop:** Every section is evaluated; if the quality score is below 85, it is automatically rewritten.
+- **Graphics Designing:** An expert art director agent generates highly detailed DALL-E/Midjourney prompts for every section.
+- **Humanizer:** Final pass to vary sentence structures and remove AI-typical symmetry.
 
-- Compile the final article into `index.md`.
-- Use the **seo-helper.js** script to verify word counts and keyword density.
-- Write the **Meta Description** (150-160 chars) and define the final URL slug.
+## 📁 Output Management
 
-> [!IMPORTANT]
-> Never write a full article in a single step without research and planning. Always proceed through the article-slug directory workflow to ensure high-quality output.
+All generated articles, including metadata, HTML, and image prompts, are stored as structured JSON/HTML in:
+`scripts/outputs/articles/[article-slug].json`
+
+> [!TIP]
+> **The more detailed your prompt, the deeper my research.** I don't just write; I engineer content that beats the competition on the SERP.

@@ -1,0 +1,15 @@
+{
+  "type": "object",
+  "properties": {
+    "audience": { "type": "string" },
+    "searchIntent": { "type": "string" },
+    "tone": { "type": "string" },
+    "narrativeStyle": { "type": "string" },
+    "differentiationStrategy": { "type": "string" },
+    "contentDepth": { "type": "string" },
+    "uniqueAngles": { "type": "array", "items": { "type": "string" } },
+    "mustIncludeTopics": { "type": "array", "items": { "type": "string" } },
+    "avoidPatterns": { "type": "array", "items": { "type": "string" } }
+  },
+  "required": ["audience", "searchIntent", "tone", "narrativeStyle", "differentiationStrategy", "contentDepth", "uniqueAngles", "mustIncludeTopics", "avoidPatterns"]
+}
