@@ -16,7 +16,7 @@ class Agent {
     this.conversationHistory = new Map();
     this.MAX_HISTORY = 20;
     this.DEFAULT_MAX_ITERATIONS = 10;
-    this.MAX_CONTENT_LENGTH = 200;
+    this.MAX_CONTENT_LENGTH = 200 * 5;
   }
 
   _getSessionFilePath(sessionKey) {
@@ -39,7 +39,10 @@ class Agent {
         const filePath = this._getSessionFilePath(sessionKey);
         const data = workspace.readWorkspaceFile(filePath);
         if (data) {
-          this.conversationHistory.set(sessionKey, JSON.parse(data));
+          this.conversationHistory.set(
+            sessionKey,
+            [...JSON.parse(data)].slice(-100),
+          );
         } else {
           this.conversationHistory.set(sessionKey, []);
         }
@@ -117,12 +120,12 @@ class Agent {
     return toolCalls;
   }
   async processMessage(text, options = {}) {
-    const { channel = "cli", from = "user", senderName, onEvent } = options;
+    const { channel = "web", from = "user", senderName, onEvent } = options;
     const timestamp = new Date().toISOString();
     const timeStr = new Date().toLocaleTimeString();
     const sessionKey = `${channel}:${from}`;
     const logText = `${senderName || "user"}: ${text}`;
-    
+
     appendHistory(
       `[${timestamp}] [${channel}] ${from} (${senderName || "user"}): ${text}`,
     );
@@ -156,9 +159,9 @@ class Agent {
 
     systemPrompt += contextAdditions;
 
-    this.addToHistory(sessionKey, { 
-      role: "user", 
-      content: `[${timeStr}] ${logText}` 
+    this.addToHistory(sessionKey, {
+      role: "user",
+      content: `[${timeStr}] ${logText}`,
     });
 
     const tools = getToolsSchema();
@@ -188,7 +191,7 @@ class Agent {
         assistantMsg.content = `[${new Date().toLocaleTimeString()}] ${assistantMsg.content}`;
       }
       this.addToHistory(sessionKey, assistantMsg);
-      
+
       if (response.content) {
         lastContent = response.content;
       }
@@ -236,7 +239,7 @@ class Agent {
         };
         // Add timestamp to tool result content
         toolMsg.content = `[${new Date().toLocaleTimeString()}] Result from ${r.tool}: ${toolMsg.content}`;
-        
+
         this.addToHistory(sessionKey, toolMsg);
         turnToolsResult.push(toolMsg);
       }

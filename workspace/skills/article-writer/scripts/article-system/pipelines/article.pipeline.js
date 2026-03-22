@@ -18,77 +18,99 @@ import utils from "../core/utils.js";
 class ArticlePipeline {
   async run(topic) {
     console.log("Starting pipeline for:", topic);
-    
+
     // 1. Keywords & SERP
     const seeds = await seed.generate(topic);
-    console.log("Seeds generated:", seeds.length);
-    
+    console.log("Seeds generated:", seeds.length, JSON.stringify(seeds));
+
     const serpData = await serpScraper.scrape(seeds);
     const serpAnalysis = await serpAnalyzer.analyze(serpData);
     console.log("SERP Analysis done");
-    
+
     const scoredKeywords = await scorer.score(seeds, serpAnalysis);
     console.log("Keywords Scored");
-    
+
     // 2. Planning
-    const bp = await blueprint.create(topic, scoredKeywords.primaryKeywords, serpAnalysis);
-    const ol = await outline.generate(topic, bp, scoredKeywords.primaryKeywords, serpAnalysis);
+    const bp = await blueprint.create(
+      topic,
+      scoredKeywords.primaryKeywords,
+      serpAnalysis,
+    );
+    const ol = await outline.generate(
+      topic,
+      bp,
+      scoredKeywords.primaryKeywords,
+      serpAnalysis,
+    );
     const metaData = await meta.generate(topic, scoredKeywords.primaryKeywords);
-    
+
     console.log("Blueprint & Outline created");
-    
+
     // 3. Writing Loop
     const sections = [];
     let context = "";
-    
+
     for (const section of ol.sections) {
       console.log("Writing section:", section.title);
       let blocks = await sectionWriter.write(section, bp, context);
-      
+
       blocks = await dataInjector.inject(blocks);
-      
+
       // Graphics Designer
       const assets = await graphicsDesigner.generatePrompts(section, bp);
       if (assets.length) {
-        console.log(`Generated ${assets.length} image prompts for section: ${section.title}`);
-        assets.forEach(asset => {
+        console.log(
+          `Generated ${assets.length} image assets for section: ${section.title}`,
+        );
+        assets.forEach((asset) => {
           blocks.push({
             type: "image",
             content: asset.prompt,
+            src: asset.url || "#", // Real URL if generated
             alt: asset.description,
-            placement: asset.placement
+            placement: asset.placement,
+            isReal: !!asset.isRealImage,
           });
         });
       }
-      
+
       // Critic Loop
       let critique = await critic.evaluate(section.title, blocks, bp);
       let attempts = 0;
       while (critique.score < 85 && critique.rewrite && attempts < 2) {
-         console.log(`Rewriting section ${section.title} (Score: ${critique.score})...`);
-         blocks = await sectionWriter.write(section, bp, context + `\nPrevious critique: ${JSON.stringify(critique.issues)}`);
-         blocks = await dataInjector.inject(blocks);
-         // Redo Graphics Designer on rewrite if needed
-         critique = await critic.evaluate(section.title, blocks, bp);
-         attempts++;
+        console.log(
+          `Rewriting section ${section.title} (Score: ${critique.score})...`,
+        );
+        blocks = await sectionWriter.write(
+          section,
+          bp,
+          context + `\nPrevious critique: ${JSON.stringify(critique.issues)}`,
+        );
+        blocks = await dataInjector.inject(blocks);
+        // Redo Graphics Designer on rewrite if needed
+        critique = await critic.evaluate(section.title, blocks, bp);
+        attempts++;
       }
-      
+
       sections.push({ ...section, blocks });
-      context += blocks.map(b => b.content).join(" ").slice(0, 500); 
+      context += blocks
+        .map((b) => b.content)
+        .join(" ")
+        .slice(0, 500);
     }
-    
+
     // 4. Humanize
     console.log("Humanizing...");
     const humanizedSections = await humanizer.run(sections);
-    
+
     // 5. Assemble
     const finalOutput = assembler.assemble(metaData, ol, humanizedSections);
-    
+
     // Save
-    const outputPath = `article-system/outputs/articles/${metaData.slug || 'output'}.json`;
+    const outputPath = `article-system/outputs/articles/${metaData.slug || "output"}.json`;
     utils.writeJson(outputPath, finalOutput);
     console.log("Saved to:", outputPath);
-    
+
     return finalOutput;
   }
 }

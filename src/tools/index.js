@@ -32,7 +32,6 @@ import {
   delete_cron_job,
 } from "./cron_tools.js";
 import { terminal_exec } from "./terminal_tools.js";
-import { browser_tool } from "./browser_tool.js";
 import { todo_tool, spawn_subagent } from "./agent_tools.js";
 
 const coreTools = [
@@ -54,7 +53,6 @@ const coreTools = [
   update_cron_job,
   delete_cron_job,
   terminal_exec,
-  // browser_tool, // as long as browser can be controlled by romi cli, so let it not to use.
   todo_tool,
   spawn_subagent,
 ];

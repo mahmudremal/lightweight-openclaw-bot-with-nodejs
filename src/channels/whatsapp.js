@@ -17,6 +17,7 @@ import Formatter from "../utils/formatter.js";
 
 class WhatsApp {
   constructor() {
+    this.needConnection = true;
     this.sock = null;
     this.authState = null;
     this.retryCount = 0;

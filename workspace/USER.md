@@ -5,14 +5,14 @@ Information about your human goes here.
 ## Preferences
 
 - Communication style: (casual/formal)
-- Timezone: (your timezone)
-- Language: (your preferred language)
+- Timezone:
+- Language:
 
 ## Personal Information
 
-- Name: (optional)
-- Location: (optional)
-- Occupation: (optional)
+- Name:
+- Location:
+- Occupation:
 
 ## Learning Goals
 

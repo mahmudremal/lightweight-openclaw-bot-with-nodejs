@@ -1,13 +1,5 @@
 import http from "http";
-
 const PORT = 8765;
-const MODE = process.argv[2];
-const PROMPT = process.argv.slice(3).join(" ");
-
-if (!MODE || !PROMPT) {
-  console.log("Usage: node nanobanana.js <image|music> <prompt>");
-  process.exit(1);
-}
 
 const request = (path, method, data) => {
   return new Promise((resolve, reject) => {
@@ -44,8 +36,16 @@ const selectors = {
     ".extension-processing-state + .response-content .model-response-text .attachment-container.generated-musics .generated-music .audio",
 };
 
-async function run() {
+async function run(prompt = null, mode = null) {
   try {
+    const MODE = mode ?? process.argv[2];
+    const PROMPT = prompt ?? process.argv.slice(3).join(" ");
+
+    if (!MODE || !PROMPT) {
+      console.log("Usage: node nanobanana.js <image|music> <prompt>");
+      process.exit(1);
+    }
+
     const clients = await request("/api/browsers", "GET");
     if (!clients.length) throw new Error("No browser connected");
     const clientId = clients[0].id;
@@ -110,6 +110,8 @@ async function run() {
       },
       clientId,
     );
+
+    // return;
 
     console.log(`⏳ Wait for 15s...`);
     await sleep(15000);
@@ -189,6 +191,9 @@ async function run() {
     await sleep(1000);
 
     await exec("close", { tabId }, clientId);
+
+    if (prompt) return result;
+
     process.exit(0);
   } catch (err) {
     console.error("❌ Error:", err.message);
@@ -196,4 +201,6 @@ async function run() {
   }
 }
 
-run();
+if (process.argv?.length >= 3) run();
+
+export { run };

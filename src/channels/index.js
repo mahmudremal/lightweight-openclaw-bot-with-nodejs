@@ -15,7 +15,7 @@ class Channels {
   }
 
   async init() {
-    // this.launchChannels();
+    this.launchChannels(true);
     events.on("internet:online", this.launchChannels.bind(this));
     events.on("internet:offline", this.stopAll.bind(this));
 
@@ -30,7 +30,7 @@ class Channels {
     // });
   }
 
-  async launchChannels() {
+  async launchChannels(offline = false) {
     logger.info("CHANNELS", "Initializing enabled channels...");
     const activeConfig = await config.getActiveConfig();
     const channelConfigs = activeConfig.channels || {};
@@ -39,7 +39,13 @@ class Channels {
       if (enabled && this.channels?.[name]) {
         logger.info("CHANNELS", `Starting channel: ${name}`);
         try {
-          await this.channels[name].init();
+          if (offline) {
+            if (!this.channels[name]?.needConnection) {
+              await this.channels[name].init();
+            }
+          } else {
+            await this.channels[name].init();
+          }
         } catch (err) {
           logger.error(
             "CHANNELS",

@@ -1,36 +1,41 @@
-import OpenAI from "openai";
 import config from "../config.js";
 
 class LLM {
-  constructor() {
-    this.clients = {};
-  }
-
-  getClient(role) {
-    if (this.clients[role]) return this.clients[role];
-    const roleConfig = config.roles[role];
-    this.clients[role] = new OpenAI({
-      apiKey: roleConfig.apiKey,
-      baseURL: roleConfig.baseUrl
-    });
-    return this.clients[role];
-  }
-
   async run({ role, system, user, json = false }) {
     const roleConfig = config.roles[role];
-    const client = this.getClient(role);
+    const baseUrl = roleConfig.baseUrl ? roleConfig.baseUrl.replace(/\/$/, '') : 'https://api.openai.com/v1';
+    const endpoint = `${baseUrl}/chat/completions`;
 
-    const response = await client.chat.completions.create({
+    const body = {
       model: roleConfig.model,
       messages: [
         { role: "system", content: system },
         { role: "user", content: user }
       ],
       temperature: roleConfig.temperature,
-      response_format: json ? { type: "json_object" } : undefined
+    };
+
+    if (json) {
+      body.response_format = { type: "json_object" };
+    }
+
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${roleConfig.apiKey}`
+      },
+      body: JSON.stringify(body)
     });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`API Request Failed: ${response.status} ${response.statusText} - ${errorText}`);
+    }
+
+    const data = await response.json();
+    let content = data.choices[0].message.content.trim();
     
-    let content = response.choices[0].message.content.trim();
     if (json && content.startsWith("```")) {
       content = content.replace(/^```json\s*/, "").replace(/^```\s*/, "").replace(/\s*```$/, "");
     }

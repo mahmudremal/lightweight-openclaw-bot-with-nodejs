@@ -168,15 +168,37 @@ class RomiBrowser {
               const el = document.querySelector(params.selector);
               if (!el) throw new Error(`Element not found: ${params.selector}`);
               el.focus();
-              if (["quill"].includes(params?.editor)) {
-                el.innerHTML = params.text;
-                el.dispatchEvent(new Event("input", { bubbles: true }));
-              } else {
-                el.value = params.text;
-                el.dispatchEvent(new Event("input", { bubbles: true }));
-                el.dispatchEvent(new Event("change", { bubbles: true }));
-              }
-              if (params.keyPress) {
+			  if (params?.writeThrough == 'KeyboardEvent') {
+				const text = params.text;
+				const input = el;
+				[...text].forEach((char, i) => {
+				  setTimeout(() => {
+					input.dispatchEvent(
+					  new KeyboardEvent("keydown", { key: char, bubbles: true }),
+					);
+					const nativeSetter = Object.getOwnPropertyDescriptor(
+					  HTMLInputElement.prototype,
+					  "value",
+					).set;
+					nativeSetter.call(input, input.value + char);
+					input.dispatchEvent(new Event("input", { bubbles: true }));
+					input.dispatchEvent(
+					  new KeyboardEvent("keyup", { key: char, bubbles: true }),
+					);
+				  }, i * 50);
+				});
+			  } else {
+				  if (["quill"].includes(params?.editor)) {
+					el.innerHTML = params.text;
+					el.dispatchEvent(new Event("input", { bubbles: true }));
+				  } else {
+					el.value = params.text;
+					el.dispatchEvent(new Event("input", { bubbles: true }));
+					el.dispatchEvent(new Event("change", { bubbles: true }));
+				  }
+			  }
+			  
+              if (params?.keyPress) {
                 const [key, keyCode] = params.keyPress.split(",");
                 const keyEvent = new KeyboardEvent("keydown", {
                   key: key,

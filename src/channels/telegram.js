@@ -11,6 +11,7 @@ import preprocessor from "../utils/preprocessor.js";
 
 class Telegram {
   constructor() {
+    this.needConnection = true;
     this.bot = null;
     this.retryCount = 0;
     this.reconnectTimeout = null;

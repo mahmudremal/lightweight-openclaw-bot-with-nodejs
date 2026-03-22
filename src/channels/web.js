@@ -13,6 +13,7 @@ import { APP_SOURCE_DIR } from "../core/paths.js";
 class WebChannel {
   constructor() {
     this.app = null;
+    this.needConnection = false;
   }
   async init() {
     logger.info("WEB", "Initializing Web Dashboard channel...");
@@ -87,8 +88,8 @@ class WebChannel {
         };
 
         const reply = await processMessage(expandedBody, {
-          channel: "cli",
-          from: "cli:user",
+          channel: "web",
+          from: "web:user",
           isOwner: true,
           // senderName: session,
           onEvent,

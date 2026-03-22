@@ -74,7 +74,7 @@ class OpenAIProvider {
     };
 
     if (tools && tools.length > 0) {
-      body.tool_choice = tool_choice || "auto";
+      // body.tool_choice = tool_choice || "auto";
       body.tools = tools;
     }
 
@@ -83,6 +83,14 @@ class OpenAIProvider {
       model: body.model,
       tools_count: body.tools?.length || 0,
     });
+
+    // console.log(
+    //   JSON.stringify(
+    //     { ...body, tools: body?.tools.map((t) => t.function.name) },
+    //     null,
+    //     2,
+    //   ),
+    // );
 
     const resp = await fetch(`${API_BASE_URL}/chat/completions`, {
       method: "POST",

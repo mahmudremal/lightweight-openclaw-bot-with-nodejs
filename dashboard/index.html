@@ -11,81 +11,21 @@
     />
     <script src="assets/marked.min.js"></script>
     <link rel="stylesheet" href="assets/style.css" />
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   </head>
-  <body
-    class="bg-gray-50 h-screen flex flex-col items-center justify-center font-sans text-gray-800"
-  >
-    <div
-      class="w-full max-w-4xl h-full sm:h-[90vh] bg-white sm:rounded-2xl sm:shadow-xl flex flex-col overflow-hidden relative border border-gray-100"
-    >
-      <header
-        class="bg-white border-b border-gray-100 p-4 flex items-center justify-between z-10"
-      >
-        <div class="flex items-center gap-3">
-          <div
-            class="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold text-lg shadow-md"
-          >
-            R
-          </div>
-          <div>
-            <h1 class="text-lg font-bold text-gray-800 leading-tight">
-              Romi AI
-            </h1>
-            <p class="text-xs text-green-500 font-medium">Online</p>
-          </div>
-        </div>
-        <div>
-          <button
-            class="text-gray-400 hover:text-gray-600 transition p-2 rounded-full hover:bg-gray-100"
-          >
-            <i class="fa-solid fa-ellipsis-vertical"></i>
-          </button>
-        </div>
-      </header>
-
-      <main
-        id="chat-container"
-        class="flex-1 overflow-y-auto p-4 space-y-6 scroll-smooth bg-[#f9fafb]"
-      ></main>
-
-      <div
-        id="autocomplete-popup"
-        class="hidden absolute bottom-20 left-4 right-4 sm:left-auto sm:right-auto sm:w-[calc(100%-2rem)] max-w-2xl mx-auto bg-white rounded-xl shadow-2xl border border-gray-100 max-h-60 overflow-y-auto z-20"
-      >
-        <ul id="autocomplete-list" class="py-2"></ul>
-      </div>
-
-      <footer class="p-4 bg-white border-t border-gray-100 z-10 w-full">
-        <form
-          id="chat-form"
-          class="flex items-end gap-2 max-w-4xl mx-auto relative bg-gray-50 p-1.5 rounded-2xl border border-gray-200 focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-100 transition-all"
-        >
-          <button
-            type="button"
-            class="text-gray-400 hover:text-blue-500 p-3 rounded-xl transition flex-shrink-0"
-            title="Attach file"
-          >
-            <i class="fa-solid fa-paperclip text-lg"></i>
-          </button>
-          <textarea
-            id="message-input"
-            rows="1"
-            class="w-full bg-transparent resize-none outline-none py-3 px-2 text-gray-700 placeholder-gray-400 max-h-32 text-[15px]"
-            placeholder="Ask Romi or type / for skills, @ for files..."
-          ></textarea>
-          <button
-            type="submit"
-            id="send-btn"
-            class="bg-blue-600 text-white w-10 h-10 rounded-xl hover:bg-blue-700 transition flex items-center justify-center shadow-md disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0 mb-1 mr-1"
-          >
-            <i
-              class="fa-solid fa-paper-plane text-sm translate-x-[-1px] translate-y-[-1px]"
-            ></i>
-          </button>
-        </form>
-      </footer>
-    </div>
-
-    <script src="assets/script.js"></script>
+  <body class="bg-[#fcfcfc] h-screen flex flex-col items-center justify-center font-sans text-gray-900 selection:bg-blue-100 selection:text-blue-900">
+    <div id="root" class="w-full max-w-5xl h-full sm:h-[95vh] bg-white sm:rounded-[2.5rem] sm:shadow-[0_0_80px_-20px_rgba(0,0,0,0.08)] flex flex-col overflow-hidden relative sm:border sm:border-gray-100/50"></div>
+    
+    <!-- Components -->
+    <script type="text/babel" src="assets/ChatHeader.js"></script>
+    <script type="text/babel" src="assets/ToolIndicator.js"></script>
+    <script type="text/babel" src="assets/ChatMessage.js"></script>
+    <script type="text/babel" src="assets/Autocomplete.js"></script>
+    <script type="text/babel" src="assets/ChatInput.js"></script>
+    
+    <!-- Main Script -->
+    <script type="text/babel" src="assets/script.js"></script>
   </body>
 </html>

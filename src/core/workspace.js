@@ -99,7 +99,7 @@ class Workspace {
 
     const parts = sortedFiles
       .map((f) => {
-        let content = `# ${f}\n\n${fs.readFileSync(path.join(workspacePath, f), "utf8").trim()}`;
+        let content = `# ./${f}\n\n${fs.readFileSync(path.join(workspacePath, f), "utf8").trim()}`;
         if (f == "SKILLS.md") {
           content +=
             "\n\n" +
@@ -111,20 +111,7 @@ class Workspace {
       })
       .filter((c) => c);
 
-    const memoryGuidance = `
-### Memory and File Conventions
-- Human user info -> USER.md
-- Your "soul"/personality -> SOUL.md
-- Your identity -> IDENTITY.md
-- Long-term memories -> memory/MEMORY.md
-- Task contextual info -> memory/[task_name].md
-
-### Project Structure
-- corn/jobs.json: Scheduled jobs
-- HEARTBEAT.md: Periodic background tasks
-`;
-
-    const result = parts.join("\n\n---\n\n") + "\n\n" + memoryGuidance;
+    const result = parts.join("\n\n---\n\n");
     return result;
   }
 

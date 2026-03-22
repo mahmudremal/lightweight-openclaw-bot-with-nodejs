@@ -28,8 +28,8 @@ export function registerChatCommands(program, askQuestion) {
       const text = Array.isArray(message) ? message.join(" ") : message;
       try {
         const reply = await processMessage(text, {
-          channel: "cli",
-          from: "cli:user",
+          channel: "web",
+          from: "web:user",
           isOwner: true,
         });
         logger.log("ROMI", reply);

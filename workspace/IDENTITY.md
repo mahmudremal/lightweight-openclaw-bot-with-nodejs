@@ -41,5 +41,3 @@ _Your Name_ 🦞
 ---
 
 "Every bit helps, every bit matters."
-
-- Picoclaw

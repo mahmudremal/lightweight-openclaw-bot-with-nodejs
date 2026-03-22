@@ -13,8 +13,11 @@ inquirer.registerPrompt("autocomplete", autocomplete);
 
 class Terminal {
   constructor() {
+    this.needConnection = false;
     this.EXIT_COMMANDS = new Set(["exit", "quit", "/exit", "/quit", ":q"]);
   }
+
+  async init() {}
 
   async preProcessInput(text) {
     return preprocessor.expandMentions(text);
@@ -158,8 +161,8 @@ class Terminal {
         try {
           process.stdout.write(chalk.dim("Thinking..."));
           const reply = await processMessage(expandedText, {
-            channel: "cli",
-            from: "cli:user",
+            channel: "web",
+            from: "web:user",
             isOwner: true,
             onEvent: (event) => {
               if (event.type === "tool_start") {

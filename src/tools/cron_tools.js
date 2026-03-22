@@ -9,7 +9,35 @@ export const get_cron_jobs = {
   },
   handler: async () => {
     const jobs = await cron.getJobs();
-    return JSON.stringify(jobs, null, 2);
+    if (!jobs || jobs.length === 0) {
+      return "No cron jobs found.";
+    }
+    const months = [
+      "Jan",
+      "Feb",
+      "Mar",
+      "Apr",
+      "May",
+      "Jun",
+      "Jul",
+      "Aug",
+      "Sep",
+      "Oct",
+      "Nov",
+      "Dec",
+    ];
+    return `Here are your scheduled tasks:\n\n${jobs
+      .map(
+        (
+          { name, id, enabled, createdAtMs, updatedAtMs, schedule, payload },
+          i,
+        ) => {
+          const created = new Date(createdAtMs);
+          const updated = new Date(updatedAtMs);
+          return `${i + 1}. ${name}\n   - ID: ${id}\n   - Status: ${enabled ? "Active" : "Inactive"}\n   - Created: ${created.getDate() + " " + months[created.getMonth() - 1] + " " + created.getFullYear()}\n   - Updated: ${updated.getDate() + " " + months[updated.getMonth() - 1] + " " + updated.getFullYear()}\n   - Enabled: ${schedule.expr}, ${schedule.tz}, ${schedule.kind}\n\nPayload: \n\tKind: ${payload.kind}\n\tMessage: ${payload.message}`;
+        },
+      )
+      .join("\n")}`;
   },
 };
 

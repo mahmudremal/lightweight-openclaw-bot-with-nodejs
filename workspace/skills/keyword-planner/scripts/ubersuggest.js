@@ -1,0 +1,1 @@
+// https://app.neilpatel.com/en/ubersuggest/keyword_ideas/?ai-keyword=headless%20wordpress&domain=&extraKeywords=wordpress%20headless%20cms&extraKeywords=wordpress%20monolith%20to%20headless&keyword=headless%20wordpress&lang=en&locId=0000&mode=keyword
