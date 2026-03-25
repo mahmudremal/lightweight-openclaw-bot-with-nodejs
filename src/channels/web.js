@@ -65,6 +65,49 @@ class WebChannel {
       }
     });
 
+    // API to get older messages
+    this.app.get("/api/web/messages", async (req, res) => {
+      try {
+        const workspaceId = getActiveWorkspaceId();
+        const workspacePath = getWorkspacePath(workspaceId);
+        const filePath = path.join(
+          workspacePath,
+          "memory/sessions/web_web_user.json",
+        );
+        const messages = fs.existsSync(filePath)
+          ? fs.readJsonSync(filePath)
+          : [];
+        res.json({ ok: true, messages });
+      } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+      }
+    });
+
+    // API to clear messages
+    this.app.delete("/api/web/messages", async (req, res) => {
+      try {
+        const workspaceId = getActiveWorkspaceId();
+        const workspacePath = getWorkspacePath(workspaceId);
+        const filePath = path.join(
+          workspacePath,
+          "memory/sessions/web_web_user.json",
+        );
+        
+        // Clear file
+        if (fs.existsSync(filePath)) {
+          fs.writeJsonSync(filePath, []);
+        }
+
+        // Clear agent memory
+        const { default: agent } = await import("../core/agent.js");
+        agent.clearHistory("web:web:user");
+
+        res.json({ ok: true });
+      } catch (err) {
+        res.status(500).json({ ok: false, error: err.message });
+      }
+    });
+
     // Chat API with streaming
     this.app.post("/api/web/chat", async (req, res) => {
       res.setHeader("Content-Type", "application/x-ndjson");

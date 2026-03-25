@@ -68,32 +68,37 @@ export function registerSkillsCommands(program) {
     });
 
   skills
-    .command("install <skillName>")
-    .description("Install a skill")
+    .command("install <skillNames...>")
+    .description("Install one or more skills")
     .option("-w, --workspace <name>", "Specify the workspace to use")
-    .action(async (skillName, opts) => {
+    .action(async (skillNames, opts) => {
       const activeWorkspaceId = await resolveWorkspace(opts.workspace);
-      try {
-        const result = await installSkill(skillName, activeWorkspaceId);
-        console.log(result);
-        logger.log("ROMI", result);
-      } catch (error) {
-        logger.error("ROMI", `Failed to install: ${error.message}`);
+      for (const skillName of skillNames) {
+        try {
+          const result = await installSkill(skillName, activeWorkspaceId);
+          console.log(result);
+          logger.log("ROMI", result);
+        } catch (error) {
+          logger.error("ROMI", `Failed to install '${skillName}': ${error.message}`);
+        }
       }
       process.exit(0);
     });
 
   skills
-    .command("remove <skillName>")
-    .description("Remove a skill")
+    .command("remove <skillNames...>")
+    .description("Remove one or more skills")
     .option("-w, --workspace <name>", "Specify the workspace to use")
-    .action(async (skillName, opts) => {
+    .action(async (skillNames, opts) => {
       const activeWorkspaceId = await resolveWorkspace(opts.workspace);
-      try {
-        const result = await removeSkill(skillName, activeWorkspaceId);
-        logger.log("ROMI", result);
-      } catch (error) {
-        logger.error("ROMI", `Failed to remove: ${error.message}`);
+      for (const skillName of skillNames) {
+        try {
+          const result = await removeSkill(skillName, activeWorkspaceId);
+          console.log(result);
+          logger.log("ROMI", result);
+        } catch (error) {
+          logger.error("ROMI", `Failed to remove '${skillName}': ${error.message}`);
+        }
       }
       process.exit(0);
     });

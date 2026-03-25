@@ -3,20 +3,23 @@ class RomiBrowser {
     this.wsUrl = "ws://localhost:8765/ws/browser";
     this.reconnectInterval = null;
     this.ws = null;
+    this.ports = new Map();
+    this.pending = new Map();
     this.init();
   }
 
   init() {
     this.connect();
+    chrome.runtime.onConnect.addListener(this.handleOnConnect.bind(this));
     chrome.runtime.onMessage.addListener(this.handlePopupMessage.bind(this));
-    chrome.tabs.onCreated.addListener((tab) => {
-      console.log(`Tab created with ID: ${tab.id}`);
-    });
-    chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-      if (changeInfo.url) {
-        console.log(`Tab ${tabId} navigated to ${changeInfo.url}`);
-      }
-    });
+    // chrome.tabs.onCreated.addListener((tab) => {
+    //   // console.log(`Tab created with ID: ${tab.id}`);
+    // });
+    // chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+    //   if (changeInfo.url) {
+    //     // console.log(`Tab ${tabId} navigated to ${changeInfo.url}`);
+    //   }
+    // });
     this.keep_alive();
   }
 
@@ -68,7 +71,7 @@ class RomiBrowser {
         this.ws.send(
           JSON.stringify({
             requestId: command?.requestId,
-            result: { error: err.message },
+            result: { error: err instanceof Error ? err.message : String(err) },
           }),
         );
       }
@@ -108,10 +111,6 @@ class RomiBrowser {
     }
 
     const tab = await chrome.tabs.get(tabId);
-    // chrome.tabs.query({
-    //   active: true,
-    //   currentWindow: true,
-    // });
 
     if (!tab) return { error: "Tab not found. Create one first" };
 
@@ -149,6 +148,18 @@ class RomiBrowser {
         return { success: true, tabId: targetTabId };
       }
       return { error: "No tabId provided to close" };
+    }
+
+    if (action === "intercept") {
+      const intercept = await this.setInterceptRulesForTab(
+        tabId,
+        params.rules,
+        params.timeout,
+      );
+
+      return intercept
+        ? { success: true, intercept }
+        : { error: "No intercept executed or returned no result" };
     }
 
     const results = await chrome.scripting.executeScript({
@@ -377,6 +388,62 @@ class RomiBrowser {
       });
     }
     return true;
+  }
+
+  handleOnConnect(port) {
+    if (port.name !== "romi-channel") return;
+
+    const tabId = port.sender.tab.id;
+    this.ports.set(tabId, port);
+
+    port.onMessage.addListener((msg) => {
+      if (msg.type === "EVENT") {
+        const resolver = this.pending.get(tabId);
+        if (resolver) {
+          resolver(msg);
+          // resolver(msg.payload);
+          this.pending.delete(tabId);
+        }
+
+        chrome.runtime.sendMessage({
+          type: "ROMI_RESULT",
+          tabId,
+          data: msg.payload,
+        });
+      }
+    });
+
+    port.onDisconnect.addListener(() => {
+      this.ports.delete(tabId);
+      this.pending.delete(tabId);
+    });
+  }
+
+  setInterceptRulesForTab(tabId, rules, timeout = 15000) {
+    return new Promise((resolve, reject) => {
+      const port = this.ports.get(tabId);
+      if (!port) {
+        reject(new Error("No active port for tab" + " " + this.ports.size));
+        return;
+      }
+
+      if (this.pending.has(tabId)) {
+        this.pending.delete(tabId);
+      }
+
+      this.pending.set(tabId, resolve);
+
+      port.postMessage({ type: "SET_RULES", rules });
+
+      if (timeout) {
+        setTimeout(() => {
+          if (this.pending.has(tabId)) {
+            this.pending.delete(tabId);
+            reject(new Error("Timeout waiting for intercept"));
+          }
+        }, timeout);
+      }
+    });
   }
 }
 

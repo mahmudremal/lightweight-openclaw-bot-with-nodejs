@@ -34,13 +34,13 @@
   },
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
-      "js": ["scripts/content.js"],
-      "run_at": "document_idle"
-    },
-    {
       "matches": ["https://3c8810f4be02cd08220952c272a370cb.perchance.org/*"],
       "js": ["scripts/perchance.js"]
+    },
+    {
+      "matches": ["<all_urls>"],
+      "js": ["scripts/content.js", "scripts/injected.js"],
+      "run_at": "document_idle"
     }
   ],
   "web_accessible_resources": [
