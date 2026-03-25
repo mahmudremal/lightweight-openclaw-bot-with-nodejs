@@ -179,7 +179,7 @@ const ChatHeader = ({
                   Speech API
                 </span>
                 <button
-                  onClick={() => setTtsEnabled(!ttsEnabled)}
+                  onClick={() => setTtsEnabled((prev) => !prev)}
                   className={`w-10 h-5 rounded-full relative transition-colors ${ttsEnabled ? "bg-blue-600" : "bg-gray-200"}`}
                 >
                   <div
@@ -227,7 +227,9 @@ const ChatHeader = ({
                 className="w-full text-left p-2 hover:bg-red-50 text-red-500 rounded-xl transition-colors flex items-center gap-3 group"
               >
                 <i className="fa-solid fa-trash-can text-xs group-hover:scale-110 transition-transform"></i>
-                <span className="text-sm font-semibold">Clear current chat</span>
+                <span className="text-sm font-semibold">
+                  Clear current chat
+                </span>
               </button>
             </div>
           </div>
