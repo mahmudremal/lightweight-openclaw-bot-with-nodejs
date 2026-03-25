@@ -201,6 +201,6 @@ async function run(prompt = null, mode = null) {
   }
 }
 
-if (process.argv?.length >= 3) run();
+if (process.argv?.[2]?.includes?.("nanobanana.js")) run();
 
 export { run };

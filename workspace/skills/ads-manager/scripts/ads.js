@@ -12,26 +12,35 @@ const platforms = { meta, tiktok, google, twitter, linkedin };
 class Ads {
   constructor() {
     this.secretsFile = "./secrets.json";
-    this.secrets = fs.existsSync(this.secretsFile) ? JSON.parse(fs.readFileSync(this.secretsFile)) : false;
+    this.secrets = fs.existsSync(this.secretsFile)
+      ? JSON.parse(fs.readFileSync(this.secretsFile))
+      : false;
     this.args = process.argv.slice(2).reduce((acc, arg) => {
       const [key, value] = arg.split("=");
       acc[key.replace("--", "")] = value;
       return acc;
     }, {});
-    if (Object.keys(this.args).length > 0) this.init();
+    // if (Object.keys(this.args).length > 0) this.init();
   }
 
   async init() {
     const { platform, action, data, attachment } = this.args;
-    
+
     if (["syncAccounts", "mapPlatformIds"].includes(action)) {
       console.log(JSON.stringify(utility[action](this.secrets || {}, data)));
       return;
     }
 
-    const secretKey = (platform.startsWith("google") || platform === "youtube") ? "google" : platform;
+    const secretKey =
+      platform.startsWith("google") || platform === "youtube"
+        ? "google"
+        : platform;
     if (!this.secrets || !this.secrets[secretKey]) {
-      console.log(JSON.stringify({ error: `Secret for platform ${platform} not configured` }));
+      console.log(
+        JSON.stringify({
+          error: `Secret for platform ${platform} not configured`,
+        }),
+      );
       return;
     }
 
@@ -40,25 +49,42 @@ class Ads {
       parsedData.attachments = utility.parseAttachments(attachment);
       this.args.data = parsedData;
 
-      const pKey = platform.startsWith("google") || platform === "youtube" ? "google" : platform;
+      const pKey =
+        platform.startsWith("google") || platform === "youtube"
+          ? "google"
+          : platform;
       const platformMod = platforms[pKey];
       if (!platformMod) {
         console.log(JSON.stringify({ error: "Platform not found" }));
         return;
       }
 
-      let reqOpts = platformMod.getConfig(action, this.args, this.secrets[secretKey], platform);
+      let reqOpts = platformMod.getConfig(
+        action,
+        this.args,
+        this.secrets[secretKey],
+        platform,
+      );
       if (reqOpts && reqOpts.valid !== undefined) {
         console.log(JSON.stringify(reqOpts));
         return;
       }
-      
+
       if (!reqOpts) {
-        console.log(JSON.stringify({ error: `Unsupported action ${action} for ${platform}` }));
+        console.log(
+          JSON.stringify({
+            error: `Unsupported action ${action} for ${platform}`,
+          }),
+        );
         return;
       }
 
-      const res = await requestManager.send(reqOpts.method, reqOpts.url, reqOpts.headers, reqOpts.body);
+      const res = await requestManager.send(
+        reqOpts.method,
+        reqOpts.url,
+        reqOpts.headers,
+        reqOpts.body,
+      );
       utility.logActivity(action, platform, res);
       console.log(JSON.stringify(res));
     } catch (e) {
@@ -67,4 +93,8 @@ class Ads {
   }
 }
 
-new Ads();
+const ads = new Ads();
+
+if (process.argv?.[2]?.includes?.("ads.js")) ads.init();
+
+export default ads;
