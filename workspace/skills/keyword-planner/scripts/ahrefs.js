@@ -133,22 +133,51 @@ async function run(keyWord = null) {
       return rows;
     };
 
+    const buttonsMap = await exec(
+      "query",
+      {
+        selector:
+          ".css-dy3tow-modalWrapper .css-1mu98kz-inlineRow button[type=submit]",
+        map: { text: "span" },
+        multiple: true,
+        tabId,
+      },
+      clientId,
+    );
+    const buttons = buttonsMap
+      ? buttonsMap.results.map((r) => r.text.find((t) => t.trim()))
+      : [];
+
+    let result = "";
     let initialResults = await extractTable();
     if (initialResults) {
       console.log("Initial extractions ready.");
+      result += "# " + buttons[0] + "\n\n" + initialResults + "\n\n";
     }
+    await exec(
+      "click",
+      {
+        selector:
+          ".css-dy3tow-modalWrapper .css-1mu98kz-inlineRow button[type=submit]:not(.css-eeihp9-textColor)",
+        tabId,
+      },
+      clientId,
+    );
 
-    console.log("⏳ Waiting 10s for additional data...");
-    await sleep(10000);
+    console.log("⏳ Waiting 2s for additional data...");
+    await sleep(2000);
 
     console.log("📊 Extracting Final Table Data...");
-    let finalResults = await extractTable();
+    initialResults = await extractTable();
+    if (initialResults) {
+      result += "# " + buttons[1] + "\n\n" + initialResults + "\n\n";
+    }
 
     console.log("\n✅ Research Complete:\n");
-    console.log(finalResults || initialResults || "No results found.");
+    console.log(result || "No results found.");
 
     await exec("close", { tabId }, clientId);
-    return finalResults || initialResults || "";
+    return result || "";
   } catch (err) {
     console.error("❌ Error:", err.message);
     process.exit(1);

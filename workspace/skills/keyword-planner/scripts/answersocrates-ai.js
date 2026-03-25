@@ -2,9 +2,9 @@ import http from "http";
 
 const PORT = 8765;
 
-class Soovle {
+class AnswerSocrates {
   constructor() {
-    if (process.argv[1] && process.argv[1].includes("soovle.js")) {
+    if (process.argv[1] && process.argv[1].includes("answersocrates.js")) {
       const keyword = process.argv.slice(2).join(" ");
       this.init(keyword);
     }
@@ -47,10 +47,11 @@ class Soovle {
   }
 
   async init(keyword) {
-    const isCLI = process.argv[1] && process.argv[1].includes("soovle.js");
+    const isCLI =
+      process.argv[1] && process.argv[1].includes("answersocrates.js");
 
     if (!keyword) {
-      console.log("Usage: node soovle.js <keyword>");
+      console.log("Usage: node answersocrates.js <keyword>");
       if (isCLI) process.exit(1);
       return null;
     }
@@ -67,14 +68,16 @@ class Soovle {
       } = await this.exec(
         "create",
         {
-          url: "https://www.seo.com/soovle/",
+          url: "https://answersocrates.com/deepseek-seo-keyword-research-tool",
           untilLoad: true,
         },
         clientId,
       );
       await this.sleep(3000);
 
-      const inputSelector = 'input[type="text"]#searchinput';
+      const inputSelector =
+        'main div.max-w-5xl input[name="q"], main div.max-w-5xl input[type="text"]';
+      const buttonSelector = 'main div.max-w-5xl button[type="submit"]';
 
       console.log("✍️ Entering keyword...");
       await this.exec(
@@ -85,21 +88,25 @@ class Soovle {
           editor: "text",
           // writeThrough: "KeyboardEvent",
           // event: "",
-          keyPress: "Enter,13",
           tabId,
         },
         clientId,
       );
-      console.log("⏳ Waiting 10s for results...");
-      await this.sleep(10000);
+      await this.sleep(1000);
+
+      console.log("🖱️ Clicking search...");
+      await this.exec("click", { selector: buttonSelector, tabId }, clientId);
+
+      console.log("⏳ Waiting 30s for AI generation...");
+      await this.sleep(31000);
 
       console.log("📊 Extracting results...");
 
       const queryParams = {
-        selector: "#results-wrapper .results-item-wrapper.active",
+        selector: "main > div > .max-w-5xl > div > .grid > div",
         map: {
-          title: { selector: ".engine-icon", attr: "class" },
-          keywords: ".result-list ul li",
+          title: "h3",
+          keywords: "li",
         },
         multiple: true,
         tabId,
@@ -109,15 +116,14 @@ class Soovle {
 
       if (res.error) throw new Error(res.error);
 
-      const results = res.results.map(({ keywords, title }) => ({
-        keywords,
-        title: title.find((t) => t).replace("engine-icon icon-full ", ""),
-      }));
-
-      const output = results
-        .map(({ keywords, title }) => {
-          return `${title.slice(0, 1).toUpperCase()}${title.slice(1)}\n  ${keywords.join(",\n  ")}`;
+      const output = (res.results || [])
+        .map((item) => {
+          if (!item.title) return null;
+          const cleanTitle = item.title?.replace?.(/Copy/i, "")?.trim?.();
+          const keywords = item.keywords.join(",\n\t");
+          return `${cleanTitle || item.title}\n\t${keywords}`;
         })
+        .filter(Boolean)
         .join("\n\n");
 
       console.log("\n✅ Research Complete:\n");
@@ -135,4 +141,4 @@ class Soovle {
   }
 }
 
-export default new Soovle();
+export default new AnswerSocrates();

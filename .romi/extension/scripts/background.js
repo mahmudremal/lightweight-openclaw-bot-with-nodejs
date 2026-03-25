@@ -168,36 +168,39 @@ class RomiBrowser {
               const el = document.querySelector(params.selector);
               if (!el) throw new Error(`Element not found: ${params.selector}`);
               el.focus();
-			  if (params?.writeThrough == 'KeyboardEvent') {
-				const text = params.text;
-				const input = el;
-				[...text].forEach((char, i) => {
-				  setTimeout(() => {
-					input.dispatchEvent(
-					  new KeyboardEvent("keydown", { key: char, bubbles: true }),
-					);
-					const nativeSetter = Object.getOwnPropertyDescriptor(
-					  HTMLInputElement.prototype,
-					  "value",
-					).set;
-					nativeSetter.call(input, input.value + char);
-					input.dispatchEvent(new Event("input", { bubbles: true }));
-					input.dispatchEvent(
-					  new KeyboardEvent("keyup", { key: char, bubbles: true }),
-					);
-				  }, i * 50);
-				});
-			  } else {
-				  if (["quill"].includes(params?.editor)) {
-					el.innerHTML = params.text;
-					el.dispatchEvent(new Event("input", { bubbles: true }));
-				  } else {
-					el.value = params.text;
-					el.dispatchEvent(new Event("input", { bubbles: true }));
-					el.dispatchEvent(new Event("change", { bubbles: true }));
-				  }
-			  }
-			  
+              if (params?.writeThrough == "KeyboardEvent") {
+                const text = params.text;
+                const input = el;
+                [...text].forEach((char, i) => {
+                  setTimeout(() => {
+                    input.dispatchEvent(
+                      new KeyboardEvent("keydown", {
+                        key: char,
+                        bubbles: true,
+                      }),
+                    );
+                    const nativeSetter = Object.getOwnPropertyDescriptor(
+                      HTMLInputElement.prototype,
+                      "value",
+                    ).set;
+                    nativeSetter.call(input, input.value + char);
+                    input.dispatchEvent(new Event("input", { bubbles: true }));
+                    input.dispatchEvent(
+                      new KeyboardEvent("keyup", { key: char, bubbles: true }),
+                    );
+                  }, i * 50);
+                });
+              } else {
+                if (["quill"].includes(params?.editor)) {
+                  el.innerHTML = params.text;
+                  el.dispatchEvent(new Event("input", { bubbles: true }));
+                } else {
+                  el.value = params.text;
+                  el.dispatchEvent(new Event("input", { bubbles: true }));
+                  el.dispatchEvent(new Event("change", { bubbles: true }));
+                }
+              }
+
               if (params?.keyPress) {
                 const [key, keyCode] = params.keyPress.split(",");
                 const keyEvent = new KeyboardEvent("keydown", {
@@ -307,9 +310,26 @@ class RomiBrowser {
                   params.map || {},
                 )) {
                   if (params.multiple) {
-                    item[key] = Array.from(el.querySelectorAll(selector)).map(
-                      (e) => e.innerText.trim(),
-                    );
+                    if (typeof selector === "string") {
+                      item[key] = Array.from(el.querySelectorAll(selector)).map(
+                        (e) => e.innerText.trim(),
+                      );
+                    } else if (typeof selector === "object") {
+                      item[key] = Array.from(
+                        el.querySelectorAll(selector.selector),
+                      ).map((e) => {
+                        let data = "";
+                        if (selector.attr) {
+                          data = e.getAttribute(selector.attr);
+                        } else {
+                          data = e.innerText.trim();
+                        }
+                        if (selector.trim) {
+                          data = data.trim();
+                        }
+                        return data;
+                      });
+                    }
                   } else {
                     const sub = el.querySelector(selector);
                     item[key] = sub ? sub.innerText.trim() : null;

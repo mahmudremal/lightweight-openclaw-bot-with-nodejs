@@ -12,9 +12,16 @@ Command template: `node scripts/ads.js --platform=[PLATFORM] --action=[ACTION] [
 ## Platforms & Actions
 **Platforms:** `meta`, `tiktok`, `google-search`, `google-display`, `youtube`, `twitter`, `linkedin`
 **Actions:**
-- `getCampaigns`: List campaigns.
-- `createCampaign`: Create a new campaign. *(Requires Human Confirmation)*
-- `updateCampaign`: Update an existing campaign. *(Requires Human Confirmation)*
+- **Campaign**: `getCampaigns`, `getCampaign`, `listCampaigns`, `createCampaign` *(Requires Human Confirmation)*, `updateCampaign` *(Requires Human Confirmation)*, `deleteCampaign`, `archiveCampaign`, `duplicateCampaign`
+- **Ad Set**: `getAdSets`, `getAdSet`, `createAdSet`, `updateAdSet`, `deleteAdSet`
+- **Ad**: `getAds`, `getAd`, `createAd`, `updateAd`, `deleteAd`
+- **Media**: `uploadMedia`, `getMedia`, `deleteMedia`
+- **Audience**: `getAudiences`, `createAudience`, `updateAudience`, `deleteAudience`
+- **Budget**: `updateBudget`, `updateBiddingStrategy`
+- **Insights**: `getCampaignInsights`, `getAdSetInsights`, `getAdInsights`
+- **Account**: `getAccount`, `getAccountBalance`, `getBillingInfo`
+- **Utility**: `validatePayload`, `previewCampaign`, `estimateReach`, `checkPolicyCompliance`
+- **System**: `syncAccounts`, `mapPlatformIds`, `retryFailedTasks`
 
 ## Parameters
 | Parameter | Required For | Description |

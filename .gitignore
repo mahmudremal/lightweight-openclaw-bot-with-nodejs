@@ -5,3 +5,4 @@ storage/
 wa-session/
 /.wwebjs_cache
 /.claude
+secrets.json

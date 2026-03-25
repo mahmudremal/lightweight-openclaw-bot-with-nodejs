@@ -1,35 +1,53 @@
 ---
 name: keyword-planner
-description: Keyword research and analysis expert.
+description: Keyword research and analysis specialist.
 metadata:
   emoji: "🕷️"
 ---
 
 # Keyword Planner Skill
 
-I perform deep analysis on various keywords to help write highly optimized content. I use browser automation to gather data from multiple SEO tools.
+Performs keyword research for SEO-focused content.
+
+---
 
 ## Workflow
 
-To perform keyword research, use the `terminal_exec` tool (or `spawn_subagent`) to run the appropriate script.
+Use `terminal_exec` (or `spawn_subagent`) with the appropriate script.
 
-### 🧠 AnswerSocrates Research
+---
 
-Uses AI-driven analysis to find questions and semantic keywords.
+## 🧠 Tools & When to Use
 
-`node scripts/answersocrates.js "wordpress hosting"`
+### Core SEO Data
 
-### 🏄 Keyword Surfer Analysis
+- `ahrefs.js` → competition, SERP, difficulty
+- `ubersuggest.js` → general keyword ideas + SEO overview
 
-Extracts search volume and related keywords directly from Google Search results.
+### Search Volume
 
-`node scripts/keyword-surfer.js "best gaming laptop"`
+- `keyword-surfer.js` → quick Google volume
+- `bing-webmasters.js` → Bing volume data
+
+### Long-Tail / Questions
+
+- `answersocrates-ai.js` → AI keyword expansion
+- `answersocrates.js` → user questions (FAQ, snippets)
+
+### Multi-Platform Ideas
+
+- `soovle.js` → autocomplete from Google, YouTube, Amazon
+
+---
 
 ## Capabilities
 
-- **AI Keyword Discovery**: Leverages AnswerSocrates for long-tail and question-based keywords.
-- **Search Volume Insights**: Uses Keyword Surfer to extract real-time Google search data.
-- **Automated Extraction**: Handles navigation, waiting for dynamic content, and multi-page data collection.
+- Keyword discovery
+- Search intent understanding
+- Content optimization
+- Trend & long-tail expansion
+- Basic competition insight
 
-> [!NOTE]
-> Ensure the Romi Browser extension is connected and (for Keyword Surfer) the extension is properly installed in the browser.
+---
+
+> Note: Romi extension required. Keyword Surfer must be installed.

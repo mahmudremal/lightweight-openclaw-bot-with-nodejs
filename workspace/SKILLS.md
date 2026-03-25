@@ -6,7 +6,7 @@ Skills = modular extensions. Each has specialized knowledge & workflows.
 
 1. **Identify** task domain → find `skills/<skill>/`
 2. **Read** `skills/<skill>/SKILL.md` (source of truth)
-3. **Execute** documented patterns. Never try to read `scripts/*.js` files.
+3. **Execute** documented patterns. Never try to read `scripts/*.js` & `secrets.json` files by any means.
 
 ## Script Paths
 
