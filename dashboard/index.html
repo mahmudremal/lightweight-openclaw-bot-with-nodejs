@@ -7,24 +7,32 @@
     <script src="assets/tailwindcss.js"></script>
     <link
       rel="stylesheet"
-      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+      href="assets/font-awesome.all.min.css"
     />
     <script src="assets/marked.min.js"></script>
     <link rel="stylesheet" href="assets/style.css" />
-    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script
+      crossorigin
+      src="assets/react.development.js"
+    ></script>
+    <script crossorigin src="assets/react-dom.development.js"></script>
+    <script src="assets/babel.min.js"></script>
   </head>
-  <body class="bg-[#fcfcfc] h-screen flex flex-col items-center justify-center font-sans text-gray-900 selection:bg-blue-100 selection:text-blue-900">
-    <div id="root" class="w-full max-w-5xl h-full sm:h-[95vh] bg-white sm:rounded-[2.5rem] sm:shadow-[0_0_80px_-20px_rgba(0,0,0,0.08)] flex flex-col overflow-hidden relative sm:border sm:border-gray-100/50"></div>
-    
+  <body
+    class="bg-[#fcfcfc] h-screen flex flex-col items-center justify-center font-sans text-gray-900 selection:bg-blue-100 selection:text-blue-900"
+  >
+    <div
+      id="root"
+      class="w-full max-w-5xl h-full sm:h-[95vh] bg-white sm:rounded-[2.5rem] sm:shadow-[0_0_80px_-20px_rgba(0,0,0,0.08)] flex flex-col overflow-hidden relative sm:border sm:border-gray-100/50"
+    ></div>
+
     <!-- Components -->
     <script type="text/babel" src="assets/ChatHeader.js"></script>
     <script type="text/babel" src="assets/ToolIndicator.js"></script>
     <script type="text/babel" src="assets/ChatMessage.js"></script>
     <script type="text/babel" src="assets/Autocomplete.js"></script>
     <script type="text/babel" src="assets/ChatInput.js"></script>
-    
+
     <!-- Main Script -->
     <script type="text/babel" src="assets/script.js"></script>
   </body>

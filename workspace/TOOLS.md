@@ -17,3 +17,4 @@
 - **Markdown**: Use for readability
 - **Parallelism**: Multiple independent tool calls OK
 - **One loop**: Finish in few turns
+- **Context Awareness**: Do not re-read files already provided in the current context.

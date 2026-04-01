@@ -1,35 +1,47 @@
 ---
 name: site-analyzer
-description: Site analysis for SEO, performance, UI/UX, traffic, etc.
+description: SEO, Performance, CRM, and Communication agent for site analysis.
 metadata:
   emoji: "🔍"
 ---
 
-# Site Analyzer Guidelines
+# Site Analyzer Skill
 
-This skill handles automated site analysis submissions, retrieval of reports, generating PDF exports, and managing domain contact information. 
+Professional tool for automated site audits, lead management, and customer CRM. Optimized for customer support agents.
 
-## Instructions for Agent
-1. Determine the user's goal: Do they want to scan a new site, fetch a complete report, delete an old report, or fetch/update contact info?
-2. Parameter Guidelines:
-   - `--action`: Mandatory. Options: `addSite`, `get`, `report`, `delete`, `contacts`, `add-contact`.
-   - `--site`: Mandatory. The target domain URL (e.g., https://example.com).
-   - `--fields`: Optional (only for `addSite`). Comma-separated metrics to analyze (e.g., `seo,performance,ui/ux,traffic`).
-   - `--report`: Optional (for `get` or `delete`). Specify a specific metric like `seo` or use `all`. Default is usually `all`.
-   - `--attachment`: Optional (for `report`). If set to `true`, generates a mock PDF file.
-   - `--platform` & `--value`: Required when action is `add-contact`.
-3. State Management: The analysis may take time. Initial `addSite` puts it in `pending` state. The agent must recall the site later using `get` to verify if it's `completed` and present the results.
-4. Take decisive action utilizing the output and avoid overwhelming the user with raw logs unless requested.
+## Core Directives
 
-## Examples
-Initiate Analysis:
-`node scripts/analyzer.js --action=addSite --site=https://domain.com --fields=seo,performance`
+1. **Analysis Workflow**: Add site (`addSite`) -> Check status (`getSite`) -> Fetch report (`getReport`) -> Provide PDF (`getPdf`).
+2. **CRM Workflow**: Manage leads (`getLeads`, `addLead`), schedule events (`addEvent`, `getCalendar`), and track conversations (`getContacts`, `getConversations`).
+3. **Communication**: Fetch/Send emails (`getEmails`, `sendEmail`) and WhatsApp (`sendWhatsApp`).
+4. **Time Formats**: Input human-readable dates (e.g., "2026-03-30 14:00"). The script handles timestamp conversion.
+5. **Advanced Documentation**: If you need an API endpoint or parameter NOT listed here, you **MUST** read `ROUTES.md` to find the correct implementation. The script `scripts/analyzer.js` supports all routes via the `--action` parameter.
 
-Check Status/Results:
-`node scripts/analyzer.js --action=get --site=https://domain.com --report=all`
+## Primary CLI Commands
 
-Export PDF:
-`node scripts/analyzer.js --action=report --site=https://domain.com --attachment=true`
+### Domain & Audit
+- `addSite`: `--site=[url] --types=[seo,performance,uiux]`
+- `getSite`: `--site=[url]` or `--id=[id]`
+- `getReport`: `--domainId=[id]`
+- `getPdf`: `--domainId=[id] --regenerate=true`
 
-Add Contact Details:
-`node scripts/analyzer.js --action=add-contact --site=https://domain.com --platform=whatsapp --value=+1234567890`
+### Leads & CRM
+- `getLeads`: `--status=[new,contacted] --limit=10`
+- `addLead`: `--domainId=[id] --email=[email] --name=[name]`
+- `getContacts`: `--domainId=[id]`
+- `getConversations`: `--domainId=[id]`
+
+### Calendar
+- `getCalendar`: `--start="today" --end="next week"`
+- `addEvent`: `--title=[text] --startTime=[date] --type=[task,meeting]`
+- `deleteEvent`: `--id=[id]`
+
+### Email & WhatsApp
+- `getEmails`: `--mailbox=[INBOX] --limit=10`
+- `sendEmail`: `--to=[email] --subject=[text] --body=[text] --domainId=[id]`
+- `sendWhatsApp`: `--to=[phone] --message=[text] --domainId=[id]`
+
+## Example
+`node scripts/analyzer.js --action=addEvent --title="Audit Review" --startTime="tomorrow 10am" --type=task`
+
+See `ROUTES.md` for uncommon API endpoints.
