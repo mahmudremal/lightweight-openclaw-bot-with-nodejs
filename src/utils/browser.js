@@ -1,4 +1,4 @@
-import puppeteer from "puppeteer";
+// import puppeteer from "puppeteer";
 import { WebSocketServer } from "ws";
 import config from "../config/index.js";
 import logger from "./logger.js";
@@ -11,6 +11,8 @@ class Browser {
   constructor() {}
 
   async setup_browser() {
+    logger.info("BROWSER", "No headless browser use...");
+    return null;
     logger.info("BROWSER", "Launching shared browser instance...");
 
     const userDataDir = path.resolve(ROOT_DIR, "storage", "browser-data");
