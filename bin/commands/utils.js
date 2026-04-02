@@ -1,6 +1,7 @@
 import { initProject } from "../../src/init.js";
 import { createWorkspace } from "../../src/core/workspace.js";
 import logger from "../../src/utils/logger.js";
+import open from "open";
 
 export function registerUtilCommands(program) {
   program
@@ -33,7 +34,10 @@ export function registerUtilCommands(program) {
     .command("dashboard")
     .description("Open dashboard web interface")
     .action(async () => {
-      logger.log("ROMI", "Dashboard feature coming soon!");
+      const url = "http://localhost:8765/dashboard";
+      logger.info("ROMI", `Opening dashboard at ${url}...`);
+      await open(url);
+      await new Promise((resolve) => setTimeout(resolve, 2000));
       process.exit(0);
     });
 }
